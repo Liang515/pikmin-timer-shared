@@ -815,7 +815,7 @@ export default function PikminDashboard() {
                         if (val.trim()) createRoom(val.trim());
                       }
                     }}
-                    className="w-full bg-white dark:bg-slate-800 border-2 border-stone-200/50 dark:border-slate-700 px-4 py-3 rounded-2xl outline-none focus:border-emerald-500 dark:focus:border-emerald-500 font-bold text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all shadow-sm" 
+                    className="w-full bg-white dark:bg-slate-800 border-2 border-stone-200/50 dark:border-slate-700 px-4 py-3 rounded-2xl outline-none focus:border-emerald-500 dark:focus:border-emerald-500 font-bold text-base text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all shadow-sm" 
                   />
                   <button 
                     onClick={() => {
@@ -1026,7 +1026,7 @@ export default function PikminDashboard() {
                   if (e.key === 'Escape') cancelAddGroup();
                 }}
                 placeholder={t.newArea}
-                className="w-24 sm:w-32 bg-transparent text-slate-800 dark:text-slate-100 font-bold outline-none text-sm placeholder:text-slate-400"
+                className="w-24 sm:w-32 bg-transparent text-slate-800 dark:text-slate-100 font-bold outline-none text-base placeholder:text-slate-400"
                 autoFocus
               />
               <button onClick={commitAddGroup} className="text-emerald-500 hover:text-emerald-600 p-0.5 active:scale-90 transition-transform">
@@ -1330,7 +1330,7 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
           <input 
             value={editName}
             onChange={e => setEditName(e.target.value)}
-            className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg w-full font-bold text-slate-700 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500 text-sm sm:text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 mb-3"
+            className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg w-full font-bold text-slate-700 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500 text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 mb-3"
             placeholder={t.defaultMushroom}
           />
           <ParticipantSlider value={editP} onChange={setEditP} />
