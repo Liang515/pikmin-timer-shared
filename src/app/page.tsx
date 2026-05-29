@@ -1,7 +1,10 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Minus, ExternalLink, Trash2, RotateCcw, Clock, BellRing, Sparkles, Users, Edit3, Check, X, MapPin, Globe, Moon, Sun, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Minus, ExternalLink, Trash2, RotateCcw, Clock, BellRing, Sparkles, Users, Edit3, Check, X, MapPin, Globe, Moon, Sun, ChevronUp, ChevronDown, Copy, LogOut, Share2, Users2, ArrowLeft } from 'lucide-react';
 import { Mushroom, AreaGroup } from '@/types/mushroom';
+import { db, auth } from './firebase';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
 type Lang = 'zh' | 'en';
 const T = {
@@ -46,7 +49,27 @@ const T = {
     expand: '展開所有區域',
     recordsCount: (count: number) => `${count} 個紀錄`,
     confirmDelete: '確定刪除？',
-    deleteBtn: '刪除'
+    deleteBtn: '刪除',
+    
+    // V4 Shared version strings
+    welcomeTitle: '🍄 共享蘑菇戰報',
+    welcomeSubtitle: '建立一個多人共享房間，與您的探險小隊即時同步所有蘑菇重生倒數！',
+    createRoomBtn: '✨ 建立共享房間',
+    joinRoomBtn: '🔗 加入共享房間',
+    localModeBtn: '👤 個人單機模式',
+    roomNameLabel: '共享房間名稱',
+    roomNamePlaceholder: '例如：台北大安團、台中追菇小隊',
+    roomCodeLabel: '請輸入 6 位數房間密碼',
+    roomCodePlaceholder: '例如：X9W3R2',
+    creatingRoom: '正在建立房間...',
+    joiningRoom: '正在加入房間...',
+    invalidRoomCode: '房間密碼無效或找不到該房間',
+    roomInfoTitle: '正在共享房間：',
+    copiedLink: '📋 邀請連結已複製！',
+    copyLinkBtn: '複製邀請連結',
+    exitRoomBtn: '退出房間',
+    roomCreator: '房主',
+    playersInRoom: '在線成員'
   },
   en: {
     home: 'Home',
@@ -89,7 +112,27 @@ const T = {
     expand: 'Expand All Areas',
     recordsCount: (count: number) => `${count} ${count === 1 ? 'record' : 'records'}`,
     confirmDelete: 'Delete?',
-    deleteBtn: 'Delete'
+    deleteBtn: 'Delete',
+    
+    // V4 Shared version strings
+    welcomeTitle: '🍄 Shared Mushroom Timer',
+    welcomeSubtitle: 'Create a shared room and sync all active countdowns in real-time with your squad!',
+    createRoomBtn: '✨ Create Shared Room',
+    joinRoomBtn: '🔗 Join Shared Room',
+    localModeBtn: '👤 Local Offline Mode',
+    roomNameLabel: 'Shared Room Name',
+    roomNamePlaceholder: 'e.g., Central Park Raiders',
+    roomCodeLabel: 'Enter 6-character Room Code',
+    roomCodePlaceholder: 'e.g., X9W3R2',
+    creatingRoom: 'Creating room...',
+    joiningRoom: 'Joining room...',
+    invalidRoomCode: 'Invalid code or room not found',
+    roomInfoTitle: 'Sharing Room: ',
+    copiedLink: '📋 Invite link copied!',
+    copyLinkBtn: 'Copy Invite Link',
+    exitRoomBtn: 'Exit Room',
+    roomCreator: 'Creator',
+    playersInRoom: 'Online Members'
   }
 };
 
@@ -290,13 +333,38 @@ export default function PikminDashboard() {
   const [warningMessage, setWarningMessage] = useState("");
   const [isGroupsExpanded, setIsGroupsExpanded] = useState(false);
 
+  // V4 Shared Room States
+  const [roomId, setRoomId] = useState<string>("");
+  const [roomName, setRoomName] = useState<string>("");
+  const [userId, setUserId] = useState<string>("");
+  const [loadingRoom, setLoadingRoom] = useState<boolean>(false);
+  const [roomError, setRoomError] = useState<string>("");
+  const [showCopyMessage, setShowCopyMessage] = useState<boolean>(false);
+
   const notifiedSet = useRef<Set<string>>(new Set());
 
   const t = T[lang];
 
+  // 1. Firebase Auth Anonymous Sign-In on mount
   useEffect(() => {
-    const savedMs = localStorage.getItem('pikmin_mushrooms');
-    const savedGroups = localStorage.getItem('pikmin_groups');
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUserId(user.uid);
+      } else {
+        signInAnonymously(auth)
+          .then((userCred) => {
+            setUserId(userCred.user.uid);
+          })
+          .catch((err) => {
+            console.error("Firebase auth error:", err);
+          });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Language & Theme setup on mount
+  useEffect(() => {
     const savedLang = localStorage.getItem('pikmin_lang') as Lang;
     const savedTheme = localStorage.getItem('pikmin_theme') as 'light' | 'dark' | null;
 
@@ -317,29 +385,63 @@ export default function PikminDashboard() {
       document.documentElement.classList.remove('dark');
     }
 
-    let initialGroups: AreaGroup[] = [];
-    if (savedGroups) {
-      initialGroups = JSON.parse(savedGroups);
-      initialGroups.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
-    } else {
-      initialGroups = [{ id: 'default', name: savedLang === 'en' ? 'Home' : '首頁', lastAccessed: Date.now() }];
-    }
-    setGroups(initialGroups);
-    setActiveGroupId(initialGroups[0].id);
-
-    if (savedMs) setMushrooms(JSON.parse(savedMs));
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // 3. Check URL parameters for ?room=X9W3R2
   useEffect(() => {
+    if (!userId) return;
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get('room');
+    if (roomParam) {
+      const code = roomParam.trim().toUpperCase();
+      if (code.length === 6) {
+        joinRoom(code);
+      }
+    }
+  }, [userId]);
+
+  // 4. Load from LocalStorage if roomId === "local"
+  useEffect(() => {
+    if (roomId !== "local") return;
+    const savedMs = localStorage.getItem('pikmin_mushrooms');
+    const savedGroups = localStorage.getItem('pikmin_groups');
+    
+    let initialGroups: AreaGroup[] = [{ id: 'default', name: lang === 'en' ? 'Home' : '首頁', lastAccessed: Date.now() }];
+    if (savedGroups) {
+      try {
+        initialGroups = JSON.parse(savedGroups);
+        initialGroups.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setGroups(initialGroups);
+    setActiveGroupId(initialGroups[0].id);
+    if (savedMs) {
+      try {
+        setMushrooms(JSON.parse(savedMs));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [roomId]);
+
+  // 5. Save to LocalStorage if roomId === "local"
+  useEffect(() => {
+    if (roomId !== "local") return;
     localStorage.setItem('pikmin_mushrooms', JSON.stringify(mushrooms));
     localStorage.setItem('pikmin_groups', JSON.stringify(groups));
     localStorage.setItem('pikmin_lang', lang);
-    
+  }, [mushrooms, groups, roomId, lang]);
+
+  // 6. Push local notifications for timers
+  useEffect(() => {
     mushrooms.forEach(m => {
       const bEnd = m.battleEndTime || (m.endTime - 5 * 60000);
       if (now >= bEnd && !notifiedSet.current.has(m.id + '_battle')) {
@@ -355,9 +457,121 @@ export default function PikminDashboard() {
         }
       }
     });
-  }, [mushrooms, groups, now, lang]);
+  }, [mushrooms, now, lang]);
 
-  const addMushroom = (h: number, m: number, s: number, name: string, participants: number) => {
+  // 7. Subscribe to Firestore if roomId is active
+  useEffect(() => {
+    if (!roomId || roomId === "local") return;
+
+    // Subscribe to Groups
+    const groupsRef = collection(db, "rooms", roomId, "groups");
+    const unsubscribeGroups = onSnapshot(groupsRef, (snapshot) => {
+      const list: AreaGroup[] = [];
+      snapshot.forEach(docSnap => {
+        list.push(docSnap.data() as AreaGroup);
+      });
+      list.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+      if (list.length > 0) {
+        setGroups(list);
+        setActiveGroupId(prevActive => {
+          const exists = list.some(g => g.id === prevActive);
+          return exists ? prevActive : list[0].id;
+        });
+      }
+    });
+
+    // Subscribe to Mushrooms
+    const mushroomsRef = collection(db, "rooms", roomId, "mushrooms");
+    const unsubscribeMushrooms = onSnapshot(mushroomsRef, (snapshot) => {
+      const list: Mushroom[] = [];
+      snapshot.forEach(docSnap => {
+        list.push(docSnap.data() as Mushroom);
+      });
+      setMushrooms(list);
+    });
+
+    return () => {
+      unsubscribeGroups();
+      unsubscribeMushrooms();
+    };
+  }, [roomId]);
+
+  // 8. Shared Room Helper Functions
+  const joinRoom = async (code: string) => {
+    setLoadingRoom(true);
+    setRoomError("");
+    try {
+      const roomRef = doc(db, "rooms", code);
+      const roomSnap = await getDoc(roomRef);
+      if (roomSnap.exists()) {
+        const data = roomSnap.data();
+        setRoomName(data.name || "共享房間");
+        setRoomId(code);
+        
+        // Update URL query parameters
+        const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + `?room=${code}`;
+        window.history.replaceState({ path: newUrl }, '', newUrl);
+      } else {
+        setRoomError(t.invalidRoomCode);
+      }
+    } catch (err) {
+      console.error("Join room error:", err);
+      setRoomError("無法加入房間，請檢查網路連線或金鑰");
+    } finally {
+      setLoadingRoom(false);
+    }
+  };
+
+  const createRoom = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setLoadingRoom(true);
+    setRoomError("");
+    try {
+      const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let code = "";
+      for (let i = 0; i < 6; i++) {
+        code += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+      }
+      
+      const roomRef = doc(db, "rooms", code);
+      await setDoc(roomRef, {
+        name: trimmed,
+        createdAt: Date.now(),
+        creatorId: userId
+      });
+      
+      const defaultGroup = {
+        id: "default",
+        name: lang === 'zh' ? '首頁' : 'Home',
+        lastAccessed: Date.now()
+      };
+      await setDoc(doc(db, "rooms", code, "groups", "default"), defaultGroup);
+      
+      setRoomName(trimmed);
+      setRoomId(code);
+      
+      const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + `?room=${code}`;
+      window.history.replaceState({ path: newUrl }, '', newUrl);
+    } catch (err) {
+      console.error("Create room error:", err);
+      setRoomError("無法建立房間，請檢查網路連線");
+    } finally {
+      setLoadingRoom(false);
+    }
+  };
+
+  const exitRoom = () => {
+    setRoomId("");
+    setRoomName("");
+    setRoomError("");
+    // Clean query parameters
+    const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+    window.history.replaceState({ path: newUrl }, '', newUrl);
+  };
+
+  // 9. Data modifiers
+  const addMushroom = async (h: number, m: number, s: number, name: string, participants: number) => {
     const battleMs = (h * 3600 + m * 60 + s) * 1000;
     const battleEndTime = Date.now() + battleMs;
     const endTime = battleEndTime + 5 * 60 * 1000;
@@ -373,35 +587,43 @@ export default function PikminDashboard() {
       isFavorite: false,
       color: COLORS[mushrooms.length % COLORS.length]
     };
-    setMushrooms([...mushrooms, newMs]);
+
+    if (roomId === "local") {
+      setMushrooms([...mushrooms, newMs]);
+    } else {
+      await setDoc(doc(db, "rooms", roomId, "mushrooms", newMs.id), newMs);
+    }
   };
 
-  const updateMushroom = (id: string, updates: Partial<Mushroom>) => {
-    setMushrooms(mushrooms.map(m => m.id === id ? { ...m, ...updates } : m));
+  const updateMushroom = async (id: string, updates: Partial<Mushroom>) => {
+    if (roomId === "local") {
+      setMushrooms(mushrooms.map(m => m.id === id ? { ...m, ...updates } : m));
+    } else {
+      await updateDoc(doc(db, "rooms", roomId, "mushrooms", id), updates);
+    }
   };
 
-  const deleteMushroom = (id: string) => {
-    setMushrooms(mushrooms.filter(m => m.id !== id));
+  const deleteMushroom = async (id: string) => {
     notifiedSet.current.delete(id + '_battle');
     notifiedSet.current.delete(id + '_respawn');
     if (editingId === id) setEditingId(null);
-  };
 
-  const handleSetActiveGroup = (id: string) => {
-    setActiveGroupId(id);
-    setGroups(prevGroups => {
-      const newGroups = prevGroups.map(g => g.id === id ? { ...g, lastAccessed: Date.now() } : g);
-      return newGroups.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
-    });
-  };
-
-  // Warning auto-dismiss effect
-  useEffect(() => {
-    if (warningMessage) {
-      const timer = setTimeout(() => setWarningMessage(""), 3000);
-      return () => clearTimeout(timer);
+    if (roomId === "local") {
+      setMushrooms(mushrooms.filter(m => m.id !== id));
+    } else {
+      await deleteDoc(doc(db, "rooms", roomId, "mushrooms", id));
     }
-  }, [warningMessage]);
+  };
+
+  const handleSetActiveGroup = async (id: string) => {
+    setActiveGroupId(id);
+    const updatedGroups = groups.map(g => g.id === id ? { ...g, lastAccessed: Date.now() } : g);
+    if (roomId === "local") {
+      setGroups(updatedGroups.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0)));
+    } else {
+      await updateDoc(doc(db, "rooms", roomId, "groups", id), { lastAccessed: Date.now() });
+    }
+  };
 
   const startAddGroup = () => {
     setIsAddingGroup(true);
@@ -409,15 +631,21 @@ export default function PikminDashboard() {
     setDeleteConfirmGroupId(null);
   };
 
-  const commitAddGroup = () => {
+  const commitAddGroup = async () => {
     const trimmed = newGroupName.trim();
     if (!trimmed) {
       setIsAddingGroup(false);
       return;
     }
     const newGroup = { id: crypto.randomUUID(), name: trimmed, lastAccessed: Date.now() };
-    setGroups(prev => [newGroup, ...prev]);
-    setActiveGroupId(newGroup.id);
+    
+    if (roomId === "local") {
+      setGroups(prev => [newGroup, ...prev]);
+      setActiveGroupId(newGroup.id);
+    } else {
+      await setDoc(doc(db, "rooms", roomId, "groups", newGroup.id), newGroup);
+      setActiveGroupId(newGroup.id);
+    }
     setIsAddingGroup(false);
     setNewGroupName("");
   };
@@ -433,10 +661,14 @@ export default function PikminDashboard() {
     setDeleteConfirmGroupId(null);
   };
 
-  const commitRenameGroup = (id: string) => {
+  const commitRenameGroup = async (id: string) => {
     const trimmed = editGroupName.trim();
     if (trimmed) {
-      setGroups(groups.map(g => g.id === id ? { ...g, name: trimmed } : g));
+      if (roomId === "local") {
+        setGroups(groups.map(g => g.id === id ? { ...g, name: trimmed } : g));
+      } else {
+        await updateDoc(doc(db, "rooms", roomId, "groups", id), { name: trimmed });
+      }
     }
     setEditingGroupId(null);
   };
@@ -450,14 +682,25 @@ export default function PikminDashboard() {
     setIsAddingGroup(false);
   };
 
-  const confirmDeleteGroup = (id: string) => {
+  const confirmDeleteGroup = async (id: string) => {
     const remaining = groups.filter(g => g.id !== id);
-    setGroups(remaining);
-    setMushrooms(mushrooms.filter(m => m.groupId !== id));
-    setDeleteConfirmGroupId(null);
-    if (activeGroupId === id && remaining.length > 0) {
-      handleSetActiveGroup(remaining[0].id);
+    if (roomId === "local") {
+      setGroups(remaining);
+      setMushrooms(mushrooms.filter(m => m.groupId !== id));
+      if (activeGroupId === id && remaining.length > 0) {
+        handleSetActiveGroup(remaining[0].id);
+      }
+    } else {
+      await deleteDoc(doc(db, "rooms", roomId, "groups", id));
+      const groupMs = mushrooms.filter(m => m.groupId === id);
+      for (const m of groupMs) {
+        await deleteDoc(doc(db, "rooms", roomId, "mushrooms", m.id));
+      }
+      if (activeGroupId === id && remaining.length > 0) {
+        setActiveGroupId(remaining[0].id);
+      }
     }
+    setDeleteConfirmGroupId(null);
   };
 
   const toggleTheme = () => {
@@ -487,6 +730,119 @@ export default function PikminDashboard() {
     return a.endTime - b.endTime;
   });
 
+  if (!roomId) {
+    return (
+      <main className={`min-h-screen bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 p-4 flex items-center justify-center font-sans transition-all duration-500 ${theme}`}>
+        <div className="absolute top-4 right-4 flex gap-2">
+          <button onClick={toggleTheme} className="p-2.5 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-600 dark:text-slate-300 active:scale-95 hover:scale-105 transition-all border border-stone-200/10" title="切換主題">
+            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+          <button onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')} className="px-3.5 py-2 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-600 dark:text-slate-300 active:scale-95 hover:scale-105 transition-all font-bold flex items-center gap-1.5 text-sm border border-stone-200/10">
+             <Globe size={16} /> <span>{t.languageToggle}</span>
+          </button>
+        </div>
+
+        <div className="w-full max-w-md bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-stone-200/60 dark:border-slate-800/80 shadow-xl rounded-[2.5rem] p-6 sm:p-8 animate-in zoom-in-95 duration-300 relative overflow-hidden">
+          {/* Decorative background lights */}
+          <div className="absolute -top-12 -left-12 w-28 h-28 bg-emerald-400/10 dark:bg-emerald-400/5 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-12 -right-12 w-28 h-28 bg-amber-400/10 dark:bg-amber-400/5 rounded-full blur-2xl pointer-events-none" />
+
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shadow-inner mx-auto mb-3.5">
+              <span className="text-3xl select-none">🍄</span>
+            </div>
+            <h1 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight leading-tight mb-2">
+              {t.welcomeTitle}
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium px-2 leading-relaxed">
+              {t.welcomeSubtitle}
+            </p>
+          </div>
+
+          {roomError && (
+            <div className="mb-4 bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold px-4 py-2.5 rounded-full border border-rose-500/20 flex items-center gap-1.5 animate-in slide-in-from-top-2 duration-200">
+              <span>⚠️ {roomError}</span>
+            </div>
+          )}
+
+          {loadingRoom ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-3">
+              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm font-bold text-slate-500 dark:text-slate-400">
+                {roomError ? t.joiningRoom : t.creatingRoom}
+              </span>
+            </div>
+          ) : (
+            <div className="grid gap-5">
+              {/* Join Room Section */}
+              <div className="bg-stone-50 dark:bg-slate-800/40 p-4 sm:p-5 rounded-[2rem] border border-stone-200/40 dark:border-slate-800/50 shadow-inner">
+                <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2.5">{t.roomCodeLabel}</label>
+                <div className="flex flex-col gap-2.5">
+                  <input 
+                    id="join-code-input"
+                    placeholder={t.roomCodePlaceholder}
+                    maxLength={6}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = (e.currentTarget as HTMLInputElement).value;
+                        if (val.trim().length === 6) joinRoom(val.trim().toUpperCase());
+                      }
+                    }}
+                    className="w-full bg-white dark:bg-slate-800 border-2 border-stone-200/50 dark:border-slate-700 px-4 py-3 rounded-2xl outline-none focus:border-emerald-500 dark:focus:border-emerald-500 text-center font-mono font-bold tracking-widest text-lg uppercase text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-all shadow-sm" 
+                  />
+                  <button 
+                    onClick={() => {
+                      const val = (document.getElementById('join-code-input') as HTMLInputElement)?.value;
+                      if (val.trim().length === 6) joinRoom(val.trim().toUpperCase());
+                    }}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-sm rounded-2xl shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center shrink-0"
+                  >
+                    {t.joinRoomBtn}
+                  </button>
+                </div>
+              </div>
+
+              {/* Create Room Section */}
+              <div className="bg-stone-50 dark:bg-slate-800/40 p-4 sm:p-5 rounded-[2rem] border border-stone-200/40 dark:border-slate-800/50 shadow-inner">
+                <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2.5">{t.roomNameLabel}</label>
+                <div className="flex flex-col gap-2.5">
+                  <input 
+                    id="create-name-input"
+                    placeholder={t.roomNamePlaceholder}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = (e.currentTarget as HTMLInputElement).value;
+                        if (val.trim()) createRoom(val.trim());
+                      }
+                    }}
+                    className="w-full bg-white dark:bg-slate-800 border-2 border-stone-200/50 dark:border-slate-700 px-4 py-3 rounded-2xl outline-none focus:border-emerald-500 dark:focus:border-emerald-500 font-bold text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-all shadow-sm" 
+                  />
+                  <button 
+                    onClick={() => {
+                      const val = (document.getElementById('create-name-input') as HTMLInputElement)?.value;
+                      if (val.trim()) createRoom(val.trim());
+                    }}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-sm rounded-2xl shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center shrink-0"
+                  >
+                    {t.createRoomBtn}
+                  </button>
+                </div>
+              </div>
+
+              {/* Local Offline Mode Link */}
+              <button 
+                onClick={() => setRoomId("local")}
+                className="w-full py-3.5 border-2 border-dashed border-stone-200 dark:border-slate-800 hover:bg-stone-50 dark:hover:bg-slate-800/30 text-slate-500 dark:text-slate-400 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 active:scale-95 hover:scale-[1.01]"
+              >
+                {t.localModeBtn}
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className={`min-h-screen bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 p-3 sm:p-4 pb-24 md:p-8 font-sans transition-all duration-500 ${theme}`}>
       <header className="flex justify-between items-center mb-4 sm:mb-6 max-w-2xl mx-auto bg-white/40 dark:bg-slate-900/40 backdrop-blur-md px-4 py-3 rounded-full border border-stone-200/40 dark:border-slate-800/40 shadow-sm">
@@ -504,6 +860,16 @@ export default function PikminDashboard() {
           </div>
         </div>
         <div className="flex gap-1.5 sm:gap-2">
+          {roomId === "local" && (
+            <button 
+              onClick={exitRoom} 
+              className="px-3.5 py-2 bg-stone-200/50 hover:bg-stone-300/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 rounded-full shadow-sm text-slate-600 dark:text-slate-300 active:scale-95 hover:scale-102 transition-all font-bold flex items-center gap-1.5 text-xs border border-stone-200/10 shrink-0"
+              title={lang === 'zh' ? '切換至共享房間模式' : 'Switch to Shared Room'}
+            >
+              <LogOut size={13} className="rotate-180 text-emerald-600 dark:text-emerald-400" />
+              <span>{lang === 'zh' ? '返回模式' : 'Switch Mode'}</span>
+            </button>
+          )}
           <button onClick={toggleTheme} className="p-2 sm:p-2.5 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-600 dark:text-slate-300 active:scale-95 hover:scale-105 transition-all hover:shadow-md border border-stone-200/10" title="切換主題">
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
@@ -515,6 +881,56 @@ export default function PikminDashboard() {
           </button>
         </div>
       </header>
+
+      {/* Shared Room Info Bar */}
+      {roomId && roomId !== "local" && (
+        <div className="max-w-2xl mx-auto mb-6 bg-emerald-600 text-white p-4 rounded-3xl shadow-lg shadow-emerald-700/25 flex flex-col sm:flex-row justify-between items-center gap-3 animate-in slide-in-from-top-3 duration-300 relative overflow-hidden">
+          {/* Subtle light flares */}
+          <div className="absolute -top-6 -right-6 w-20 h-20 bg-white/10 rounded-full blur-xl pointer-events-none" />
+          
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+              <Users2 size={18} />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-[10px] opacity-75 uppercase tracking-widest font-extrabold select-none leading-none mb-1">
+                {t.roomInfoTitle}
+              </span>
+              <span className="text-base font-black truncate max-w-[200px] leading-tight">
+                {roomName}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+            <div className="flex items-center gap-1.5 bg-black/15 px-3 py-1.5 rounded-full font-mono text-sm font-black select-all">
+              <span>{roomId}</span>
+            </div>
+            
+            <div className="flex gap-1.5">
+              <button 
+                onClick={() => {
+                  const shareUrl = window.location.origin + window.location.pathname + `?room=${roomId}`;
+                  navigator.clipboard.writeText(shareUrl);
+                  setShowCopyMessage(true);
+                  setTimeout(() => setShowCopyMessage(false), 2000);
+                }}
+                className="px-3.5 py-1.5 bg-white text-emerald-600 hover:bg-emerald-50 rounded-full font-extrabold text-xs transition-all active:scale-95 hover:scale-102 flex items-center gap-1 shrink-0"
+              >
+                <Share2 size={12} />
+                <span>{showCopyMessage ? t.copiedLink : t.copyLinkBtn}</span>
+              </button>
+              <button 
+                onClick={exitRoom}
+                className="p-1.5 bg-white/20 hover:bg-white/30 text-white rounded-full transition-all active:scale-95 hover:scale-105 shrink-0"
+                title={t.exitRoomBtn}
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Warning Alert Bar */}
       {warningMessage && (
