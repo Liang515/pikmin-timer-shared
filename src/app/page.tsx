@@ -69,7 +69,8 @@ const T = {
     copyLinkBtn: '複製邀請連結',
     exitRoomBtn: '退出房間',
     roomCreator: '房主',
-    playersInRoom: '在線成員'
+    playersInRoom: '在線成員',
+    recentRoomsTitle: '⏱️ 最近加入的房間'
   },
   en: {
     home: 'Home',
@@ -132,7 +133,8 @@ const T = {
     copyLinkBtn: 'Copy Invite Link',
     exitRoomBtn: 'Exit Room',
     roomCreator: 'Creator',
-    playersInRoom: 'Online Members'
+    playersInRoom: 'Online Members',
+    recentRoomsTitle: '⏱️ Recent Rooms'
   }
 };
 
@@ -340,8 +342,32 @@ export default function PikminDashboard() {
   const [loadingRoom, setLoadingRoom] = useState<boolean>(false);
   const [roomError, setRoomError] = useState<string>("");
   const [showCopyMessage, setShowCopyMessage] = useState<boolean>(false);
+  const [recentRooms, setRecentRooms] = useState<{ id: string; name: string; joinedAt: number }[]>([]);
 
   const notifiedSet = useRef<Set<string>>(new Set());
+
+  const saveRecentRoom = (code: string, name: string) => {
+    const cleanCode = code.toUpperCase();
+    setRecentRooms(prev => {
+      const filtered = prev.filter(r => r.id !== cleanCode);
+      const updated = [
+        { id: cleanCode, name: name || "共享房間", joinedAt: Date.now() },
+        ...filtered
+      ].slice(0, 5);
+      localStorage.setItem('pikmin_recent_rooms', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const removeRecentRoom = (e: React.MouseEvent, code: string) => {
+    e.stopPropagation();
+    const cleanCode = code.toUpperCase();
+    setRecentRooms(prev => {
+      const updated = prev.filter(r => r.id !== cleanCode);
+      localStorage.setItem('pikmin_recent_rooms', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   const t = T[lang];
 
@@ -367,6 +393,14 @@ export default function PikminDashboard() {
   useEffect(() => {
     const savedLang = localStorage.getItem('pikmin_lang') as Lang;
     const savedTheme = localStorage.getItem('pikmin_theme') as 'light' | 'dark' | null;
+    const savedRecent = localStorage.getItem('pikmin_recent_rooms');
+    if (savedRecent) {
+      try {
+        setRecentRooms(JSON.parse(savedRecent));
+      } catch (e) {
+        console.error(e);
+      }
+    }
 
     if (savedLang && (savedLang === 'zh' || savedLang === 'en')) {
       setLang(savedLang);
@@ -505,8 +539,10 @@ export default function PikminDashboard() {
       const roomSnap = await getDoc(roomRef);
       if (roomSnap.exists()) {
         const data = roomSnap.data();
-        setRoomName(data.name || "共享房間");
+        const rName = data.name || "共享房間";
+        setRoomName(rName);
         setRoomId(code);
+        saveRecentRoom(code, rName);
         
         // Update URL query parameters
         const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + `?room=${code}`;
@@ -550,6 +586,7 @@ export default function PikminDashboard() {
       
       setRoomName(trimmed);
       setRoomId(code);
+      saveRecentRoom(code, trimmed);
       
       const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + `?room=${code}`;
       window.history.replaceState({ path: newUrl }, '', newUrl);
@@ -829,6 +866,35 @@ export default function PikminDashboard() {
                 </div>
               </div>
 
+              {/* Recent Rooms List */}
+              {recentRooms.length > 0 && (
+                <div className="bg-stone-50/50 dark:bg-slate-800/20 p-4 sm:p-5 rounded-[2rem] border border-stone-200/40 dark:border-slate-800/50 shadow-inner flex flex-col gap-2.5 animate-in fade-in duration-300">
+                  <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{t.recentRoomsTitle}</label>
+                  <div className="flex flex-col gap-2">
+                    {recentRooms.map(room => (
+                      <div 
+                        key={room.id}
+                        onClick={() => joinRoom(room.id)}
+                        className="bg-white/60 dark:bg-slate-800/40 hover:bg-white/80 dark:hover:bg-slate-700/60 border border-stone-200/30 dark:border-slate-800/50 rounded-2xl p-3 sm:px-4 flex items-center justify-between shadow-sm hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Clock size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
+                          <span className="font-bold text-sm text-slate-700 dark:text-slate-200 truncate">{room.name}</span>
+                          <span className="font-mono text-[10px] bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded-full font-black text-slate-500 dark:text-slate-400 select-all">{room.id}</span>
+                        </div>
+                        <button
+                          onClick={(e) => removeRecentRoom(e, room.id)}
+                          className="p-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-500 rounded-lg transition-colors shrink-0"
+                          title={lang === 'zh' ? '清除此紀錄' : 'Remove record'}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Local Offline Mode Link */}
               <button 
                 onClick={() => setRoomId("local")}
@@ -884,11 +950,11 @@ export default function PikminDashboard() {
 
       {/* Shared Room Info Bar */}
       {roomId && roomId !== "local" && (
-        <div className="max-w-2xl mx-auto mb-6 bg-emerald-600 text-white p-4 rounded-3xl shadow-lg shadow-emerald-700/25 flex flex-col sm:flex-row justify-between items-center gap-3 animate-in slide-in-from-top-3 duration-300 relative overflow-hidden">
+        <div className="max-w-2xl mx-auto mb-6 bg-emerald-600 text-white p-4 rounded-3xl shadow-lg shadow-emerald-700/25 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3.5 animate-in slide-in-from-top-3 duration-300 relative overflow-hidden">
           {/* Subtle light flares */}
           <div className="absolute -top-6 -right-6 w-20 h-20 bg-white/10 rounded-full blur-xl pointer-events-none" />
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-start">
             <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
               <Users2 size={18} />
             </div>
@@ -902,7 +968,7 @@ export default function PikminDashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start border-t border-white/10 pt-3 sm:pt-0 sm:border-none">
             <div className="flex items-center gap-1.5 bg-black/15 px-3 py-1.5 rounded-full font-mono text-sm font-black select-all">
               <span>{roomId}</span>
             </div>
