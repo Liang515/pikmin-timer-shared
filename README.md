@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🍄 皮克敏共享蘑菇戰報 (Pikmin Shared Mushroom Timer)
 
-## Getting Started
+歡迎來到 **皮克敏共享蘑菇戰報**！這是一個專門為《皮克敏 Bloom (Pikmin Bloom)》玩家量身打造的**多人即時同步蘑菇戰鬥重生追蹤工具**。
 
-First, run the development server:
+透過本工具，您可以與您的探險小隊、LINE 群組或 Discord 隊友建立即時同步的共享房間，一邊追蹤蘑菇戰鬥剩餘時間，一邊同步倒數重生倒計時。
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## ✨ 核心特色與亮點
+
+### 👥 多人即時同步房間
+- **6 位數代碼房間**：一秒快速建立或輸入代碼加入專屬的小隊房間（例如 `X9W3R2`）。
+- **一鍵邀請連結**：自動生成包含房間代碼的專屬 HTTPS 連結（例如 `?room=X9W3R2`），點擊「複製邀請連結」即可直接貼到 LINE 群組分享，小隊成員點擊即可直接進入。
+- **雙向零延遲更新**：採用 Google Cloud Firestore 即時數據串流，任何成員新增區域、變更戰鬥人數、新增或刪除蘑菇，所有人在螢幕上都會零延遲同步更新！
+
+### ⏱️ 智能最近房間歷史紀錄
+- 首頁會自動記憶您最近成功建立或加入的最多 5 個房間。
+- 再次打開網頁時，首頁會浮現玻璃質感的「⏱️ 最近加入的房間」列表，**一鍵點選即可直接連線進入**，再也不需反覆複製貼上代碼！
+
+### 📱 頂級行動端優化 (iOS Auto-Zoom Fix)
+- **固定視埠防縮放**：鎖定 Viewport 比例，雙指捏合或點選輸入時，網頁寬度絕不隨意晃動、抖動。
+- **iOS 焦點防放大優化**：將所有文字輸入框（房名、區域名稱、修改蘑菇名稱）字體全面升級至 `16px (text-base)`。**徹底解決 iOS Safari / Chrome 在點選輸入時會強制自動放大網頁、鍵盤收起後必須手動縮小的經典網頁體驗 Bug！**
+- **一鍵變身複製膠囊**：資訊列的房間代碼與連結複製按鈕已內置**雙軌安全剪貼簿相容機制**（在非安全 HTTP 區網測試或 LINE 內建瀏覽器也能 100% 複製成功），點擊代碼按鈕時，膠囊內部會原處淡入變形為 `✓ 已複製！` 的精緻綠色提示，絕對不會被卡片邊緣遮擋！
+
+### 🎨 絢麗的高質感皮克敏美學
+- **夕陽黃金桃紅漸層**：戰鬥結束後的 5 分鐘重生狀態採用溫暖明亮的落日漸層 (`from-[#f8a532] to-[#e75a24]`)。
+- **溫和嫩葉鼠尾草綠**：正常戰鬥狀態採用柔和的嫩葉草綠 (`from-[#809b7b] to-[#5d7c58]`)，護眼又符合皮克敏的大自然氛圍。
+- **高質感玻璃擬態卡片**：戰鬥結束且重生完成的蘑菇卡片會轉換為高雅的半透明白色玻璃質感 (`bg-white/70 backdrop-blur-md`)，並去除多餘的呼吸起伏動畫，讓您看著螢幕眼睛不疲累。
+
+### 👤 離線單機模式備份
+- 當您隻身一人或無網路連線時，點選「個人單機模式」，系統會完美降級並使用瀏覽器的 `localStorage` 進行本地紀錄，完全不依賴雲端資料庫。
+- 頂部導航欄提供「返回模式」按鈕，讓您隨時能在「單機」與「共享」模式間優雅切換。
+
+---
+
+## 🛠️ Firebase 雲端設定教學
+
+要讓您的多人共享版正常運作，只需在您的 **[Firebase 控制台 (Firebase Console)](https://console.firebase.google.com/)** 進行以下兩項微調：
+
+### 1. 啟用背景匿名登入 (Anonymous Auth)
+為了讓隊友不需要輸入密碼、註冊帳號就能直接無感使用，我們採用了匿名身分驗證：
+1. 進入您的 Firebase 專案，在左側選單點選 **Authentication**。
+2. 切換到 **Sign-in method (登入方法)** 頁籤，點選 **新增登入供應商**。
+3. 選擇清單最下方的 **Anonymous (匿名)** ➔ 點選**啟用**並儲存。
+
+### 2. 建立 Firestore 資料庫與安全性規則
+1. 在左側選單點選 **Firestore Database** ➔ 點擊 **建立資料庫**。
+2. 伺服器位置選擇離您最近的區域（例如台灣 `asia-east1` 或香港 `asia-east2`）。
+3. 建立後，切換到 **Rules (規則)** 頁籤，將內容取代為以下安全規則，並點擊 **發佈 (Publish)**：
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 允許已通過匿名驗證的成員安全讀寫房間紀錄
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🚀 部署到 Vercel (完全免費)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+本專案完全相容於 Vercel 的免費 Next.js 託管服務。您可以用以下任一方式輕鬆部署：
 
-## Learn More
+### 方式一：Vercel CLI 終端機一分鐘部署（免用 GitHub）
+1. 在專案目錄下執行：
+   ```bash
+   npx vercel
+   ```
+2. 按照畫面提示一律按 **Enter** 接受預設值即可部署完成！
 
-To learn more about Next.js, take a look at the following resources:
+### 方式二：連動 GitHub 自動部署（推薦，持續整合）
+1. 將本專案推送至您的個人 GitHub 倉庫。
+2. 前往 [Vercel 官網](https://vercel.com/)，匯入您的該 GitHub 存放庫。
+3. 點選 **Deploy** 即完成！往後只要您 `git push` 更新代碼，網站就會自動無感更新。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 💻 本地端開發
 
-## Deploy on Vercel
+1. 安裝套件：
+   ```bash
+   npm install
+   ```
+2. 啟動本地開發伺服器：
+   ```bash
+   npm run dev
+   ```
+3. 打開瀏覽器至 [http://localhost:3000](http://localhost:3000) 即可開始測試。
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+祝您與您的探險小隊打菇愉快！🍄⚔️
