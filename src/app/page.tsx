@@ -1021,16 +1021,18 @@ export default function PikminDashboard() {
                 setShowCodeCopyMessage(true);
                 setTimeout(() => setShowCodeCopyMessage(false), 2000);
               }}
-              className="flex items-center gap-1.5 bg-black/15 hover:bg-black/25 px-3 py-1.5 rounded-full font-mono text-sm font-black transition-all active:scale-95 cursor-pointer text-white relative group"
+              className="flex items-center justify-center bg-black/15 hover:bg-black/25 px-3.5 py-1.5 rounded-full font-mono text-sm font-black transition-all active:scale-95 cursor-pointer text-white relative group min-w-[78px]"
               title={lang === 'zh' ? '點擊複製房間代碼' : 'Click to copy room code'}
             >
-              <span>{roomId}</span>
-              {showCodeCopyMessage ? <Check size={12} className="text-emerald-300 animate-in zoom-in-50 duration-150" /> : <Copy size={12} className="opacity-60 group-hover:opacity-100 transition-opacity" />}
-              
-              {/* Tooltip feedback for room code copy */}
-              {showCodeCopyMessage && (
-                <span className="absolute -top-9 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-[10px] py-1 px-2.5 rounded-lg whitespace-nowrap shadow-md animate-in fade-in zoom-in-95 slide-in-from-bottom-1 duration-150 z-50 font-sans">
-                  {lang === 'zh' ? '代碼已複製！' : 'Code Copied!'}
+              {showCodeCopyMessage ? (
+                <span className="text-xs text-emerald-300 font-sans font-extrabold flex items-center gap-1 animate-in fade-in zoom-in-95 duration-150">
+                  <Check size={12} className="shrink-0" />
+                  <span>{lang === 'zh' ? '已複製！' : 'Copied!'}</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 animate-in fade-in duration-150">
+                  <span>{roomId}</span>
+                  <Copy size={12} className="opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
                 </span>
               )}
             </button>
