@@ -517,8 +517,12 @@ export default function PikminDashboard() {
     if (roomId !== "local") return;
     localStorage.setItem('pikmin_mushrooms', JSON.stringify(mushrooms));
     localStorage.setItem('pikmin_groups', JSON.stringify(groups));
+  }, [mushrooms, groups, roomId]);
+
+  // 5.5 Save language preference unconditionally on change
+  useEffect(() => {
     localStorage.setItem('pikmin_lang', lang);
-  }, [mushrooms, groups, roomId, lang]);
+  }, [lang]);
 
   // 6. Push local notifications for timers
   useEffect(() => {

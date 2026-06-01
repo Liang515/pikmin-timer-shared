@@ -1,3 +1,5 @@
+[English Version](./README.en.md) | [繁體中文版](./README.md)
+
 # 🍄 皮克敏共享蘑菇戰報 (Pikmin Shared Mushroom Timer)
 
 歡迎來到 **皮克敏共享蘑菇戰報**！這是一個專門為《皮克敏 Bloom (Pikmin Bloom)》玩家量身打造的**多人即時同步蘑菇戰鬥重生追蹤工具**。
