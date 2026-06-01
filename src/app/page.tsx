@@ -352,7 +352,43 @@ export default function PikminDashboard() {
   const [loadingRoom, setLoadingRoom] = useState<boolean>(false);
   const [roomError, setRoomError] = useState<string>("");
   const [showCopyMessage, setShowCopyMessage] = useState<boolean>(false);
+  const [showCodeCopyMessage, setShowCodeCopyMessage] = useState<boolean>(false);
   const [recentRooms, setRecentRooms] = useState<{ id: string; name: string; joinedAt: number }[]>([]);
+
+  const copyToClipboard = (text: string) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).catch(err => {
+        console.error('Secure copy failed, trying fallback', err);
+        fallbackCopyToClipboard(text);
+      });
+    } else {
+      fallbackCopyToClipboard(text);
+    }
+  };
+
+  const fallbackCopyToClipboard = (text: string) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.width = "2em";
+    textArea.style.height = "2em";
+    textArea.style.padding = "0";
+    textArea.style.border = "none";
+    textArea.style.outline = "none";
+    textArea.style.boxShadow = "none";
+    textArea.style.background = "transparent";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+    } catch (err) {
+      console.error('Fallback copy failed', err);
+    }
+    document.body.removeChild(textArea);
+  };
 
   const notifiedSet = useRef<Set<string>>(new Set());
 
@@ -979,15 +1015,31 @@ export default function PikminDashboard() {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start border-t border-white/10 pt-3 sm:pt-0 sm:border-none">
-            <div className="flex items-center gap-1.5 bg-black/15 px-3 py-1.5 rounded-full font-mono text-sm font-black select-all">
+            <button 
+              onClick={() => {
+                copyToClipboard(roomId);
+                setShowCodeCopyMessage(true);
+                setTimeout(() => setShowCodeCopyMessage(false), 2000);
+              }}
+              className="flex items-center gap-1.5 bg-black/15 hover:bg-black/25 px-3 py-1.5 rounded-full font-mono text-sm font-black transition-all active:scale-95 cursor-pointer text-white relative group"
+              title={lang === 'zh' ? '點擊複製房間代碼' : 'Click to copy room code'}
+            >
               <span>{roomId}</span>
-            </div>
+              {showCodeCopyMessage ? <Check size={12} className="text-emerald-300 animate-in zoom-in-50 duration-150" /> : <Copy size={12} className="opacity-60 group-hover:opacity-100 transition-opacity" />}
+              
+              {/* Tooltip feedback for room code copy */}
+              {showCodeCopyMessage && (
+                <span className="absolute -top-9 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-[10px] py-1 px-2.5 rounded-lg whitespace-nowrap shadow-md animate-in fade-in zoom-in-95 slide-in-from-bottom-1 duration-150 z-50 font-sans">
+                  {lang === 'zh' ? '代碼已複製！' : 'Code Copied!'}
+                </span>
+              )}
+            </button>
             
             <div className="flex gap-1.5">
               <button 
                 onClick={() => {
                   const shareUrl = window.location.origin + window.location.pathname + `?room=${roomId}`;
-                  navigator.clipboard.writeText(shareUrl);
+                  copyToClipboard(shareUrl);
                   setShowCopyMessage(true);
                   setTimeout(() => setShowCopyMessage(false), 2000);
                 }}
