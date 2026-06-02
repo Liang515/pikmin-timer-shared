@@ -412,7 +412,7 @@ export default function PikminDashboard() {
   };
 
   const notifiedSet = useRef<Set<string>>(new Set());
-  const isRestored = useRef(false);
+  const [isRestoredState, setIsRestoredState] = useState(false);
 
   const saveRecentRoom = (code: string, name: string) => {
     const cleanCode = code.toUpperCase();
@@ -501,31 +501,36 @@ export default function PikminDashboard() {
 
   // 3. Check URL parameters for ?room=X9W3R2 or restore saved active room
   useEffect(() => {
-    if (!userId || isRestored.current) return;
-    isRestored.current = true;
+    if (!userId || isRestoredState) return;
 
     const restoreRoom = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const roomParam = params.get('room');
-      if (roomParam) {
-        const code = roomParam.trim().toUpperCase();
-        if (code.length === 6) {
-          await joinRoom(code);
-        }
-      } else {
-        const savedRoomId = await safeGetItem('pikmin_active_room');
-        if (savedRoomId) {
-          if (savedRoomId === "local") {
-            setRoomId("local");
-          } else if (savedRoomId.trim().toUpperCase().length === 6) {
-            await joinRoom(savedRoomId.trim().toUpperCase());
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const roomParam = params.get('room');
+        if (roomParam) {
+          const code = roomParam.trim().toUpperCase();
+          if (code.length === 6) {
+            await joinRoom(code);
+          }
+        } else {
+          const savedRoomId = await safeGetItem('pikmin_active_room');
+          if (savedRoomId) {
+            if (savedRoomId === "local") {
+              setRoomId("local");
+            } else if (savedRoomId.trim().toUpperCase().length === 6) {
+              await joinRoom(savedRoomId.trim().toUpperCase());
+            }
           }
         }
+      } catch (e) {
+        console.error("Error restoring room:", e);
+      } finally {
+        setIsRestoredState(true);
       }
     };
 
     restoreRoom();
-  }, [userId]);
+  }, [userId, isRestoredState]);
 
   // 4. Load from LocalStorage/Preferences if roomId === "local"
   useEffect(() => {
@@ -576,17 +581,17 @@ export default function PikminDashboard() {
 
   // Save active room preference unconditionally on change
   useEffect(() => {
-    if (isRestored.current) {
+    if (isRestoredState) {
       safeSetItem('pikmin_active_room', roomId);
     }
-  }, [roomId]);
+  }, [roomId, isRestoredState]);
 
   // Save active group preference unconditionally on change
   useEffect(() => {
-    if (activeGroupId) {
+    if (activeGroupId && isRestoredState) {
       safeSetItem('pikmin_active_group_id', activeGroupId);
     }
-  }, [activeGroupId]);
+  }, [activeGroupId, isRestoredState]);
 
   // 6. Push local notifications for timers
   useEffect(() => {
@@ -1157,8 +1162,13 @@ export default function PikminDashboard() {
               <span className="text-[10px] opacity-75 uppercase tracking-widest font-extrabold select-none leading-none mb-1">
                 {t.roomInfoTitle}
               </span>
-              <span className="text-base font-black truncate max-w-[200px] leading-tight">
+              <span className="text-base font-black truncate max-w-[200px] leading-tight flex items-center gap-1.5">
                 {roomName}
+                {roomCreatorId === userId && (
+                  <span className="bg-white/20 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider scale-90 origin-left shrink-0">
+                    {t.roomCreator || "房主"}
+                  </span>
+                )}
               </span>
             </div>
           </div>
