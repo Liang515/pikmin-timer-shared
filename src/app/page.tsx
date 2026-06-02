@@ -325,20 +325,42 @@ const COLORS = [
 
 const safeGetItem = async (key: string): Promise<string | null> => {
   if (typeof window === 'undefined') return null;
+  // 1. Try Capacitor Preferences first
   try {
     const { value } = await Preferences.get({ key });
-    return value;
+    if (value !== null) {
+      console.log(`[Storage] Preferences GET success: ${key} = ${value}`);
+      return value;
+    }
   } catch (e) {
-    return localStorage.getItem(key);
+    console.error(`[Storage] Preferences GET error for ${key}:`, e);
+  }
+  // 2. Fall back to standard localStorage
+  try {
+    const val = localStorage.getItem(key);
+    console.log(`[Storage] LocalStorage fallback GET: ${key} = ${val}`);
+    return val;
+  } catch (e) {
+    console.error(`[Storage] LocalStorage GET error for ${key}:`, e);
+    return null;
   }
 };
 
 const safeSetItem = async (key: string, value: string): Promise<void> => {
   if (typeof window === 'undefined') return;
+  // 1. Write to standard localStorage first for fast synchronous backup
+  try {
+    localStorage.setItem(key, value);
+    console.log(`[Storage] LocalStorage SET success: ${key}`);
+  } catch (e) {
+    console.error(`[Storage] LocalStorage SET error for ${key}:`, e);
+  }
+  // 2. Write to Capacitor Preferences for native persistent backup
   try {
     await Preferences.set({ key, value });
+    console.log(`[Storage] Preferences SET success: ${key}`);
   } catch (e) {
-    localStorage.setItem(key, value);
+    console.error(`[Storage] Preferences SET error for ${key}:`, e);
   }
 };
 
