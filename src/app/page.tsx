@@ -397,6 +397,7 @@ export default function PikminDashboard() {
   const [showCodeCopyMessage, setShowCodeCopyMessage] = useState<boolean>(false);
   const [recentRooms, setRecentRooms] = useState<{ id: string; name: string; joinedAt: number }[]>([]);
   const [roomCreatorId, setRoomCreatorId] = useState<string>("");
+  const [debugInfo, setDebugInfo] = useState<string>("");
 
   const copyToClipboard = (text: string) => {
     if (navigator.clipboard && window.isSecureContext) {
@@ -477,6 +478,26 @@ export default function PikminDashboard() {
       }
     });
     return () => unsubscribe();
+  }, []);
+
+  // 1.5 Capacitor Preferences Diagnostics on mount
+  useEffect(() => {
+    const runDiagnostics = async () => {
+      if (typeof window === 'undefined') return;
+      try {
+        await Preferences.set({ key: 'cap_diag_test', value: 'OK' });
+        const { value } = await Preferences.get({ key: 'cap_diag_test' });
+        if (value === 'OK') {
+          setDebugInfo("Preferences Diagnostics: SUCCESS (Native UserDefaults persistence verified)");
+        } else {
+          setDebugInfo("Preferences Diagnostics: ERROR (Native returned incorrect value)");
+        }
+      } catch (e: any) {
+        const errMsg = e?.message || e?.toString() || "Unknown plugin exception";
+        setDebugInfo(`Preferences Diagnostics: ERROR (${errMsg})`);
+      }
+    };
+    runDiagnostics();
   }, []);
 
   // 2. Language & Theme setup on mount
@@ -1120,10 +1141,17 @@ export default function PikminDashboard() {
               {/* Local Offline Mode Link */}
               <button 
                 onClick={() => setRoomId("local")}
-                className="w-full py-3.5 border-2 border-dashed border-stone-200 dark:border-slate-800 hover:bg-stone-50 dark:hover:bg-slate-800/30 text-slate-500 dark:text-slate-400 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 active:scale-95 hover:scale-[1.01]"
+                className="w-full py-3.5 border-2 border-dashed border-stone-200 dark:border-slate-800 hover:bg-stone-50 dark:hover:bg-slate-800/30 text-slate-500 dark:text-slate-400 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-1.5 active:scale-95 hover:scale-[1.01] mb-2"
               >
                 {t.localModeBtn}
               </button>
+
+              {/* Capacitor Diagnostics Debug Panel */}
+              {debugInfo && (
+                <div className="text-[10px] text-center font-mono opacity-40 select-all max-w-full truncate px-2 py-1.5 bg-slate-100/50 dark:bg-slate-800/50 rounded-xl">
+                  {debugInfo}
+                </div>
+              )}
             </div>
           )}
         </div>
