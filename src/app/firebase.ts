@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { Firestore, initializeFirestore, getFirestore, setLogLevel } from "firebase/firestore";
+import { Auth, getAuth, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence } from "firebase/auth";
 
 // Your web app's Firebase configuration
 // Replace these with your own Firebase project's credentials from your Firebase Console.
@@ -16,7 +16,34 @@ const firebaseConfig = {
 
 // Initialize Firebase (safely checks for server-side vs client-side hot-reloading)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
-const auth = getAuth(app);
+
+let db: Firestore;
+try {
+  db = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+  });
+} catch (e) {
+  db = getFirestore(app);
+}
+
+// Enable debug logging for deeper insights in Xcode console
+try {
+  setLogLevel("debug");
+} catch (e) {
+  console.error("Failed to set Firestore log level:", e);
+}
+
+let auth: Auth;
+if (typeof window !== "undefined") {
+  try {
+    auth = initializeAuth(app, {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence]
+    });
+  } catch (e) {
+    auth = getAuth(app);
+  }
+} else {
+  auth = getAuth(app);
+}
 
 export { app, db, auth };

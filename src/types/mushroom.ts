@@ -2,6 +2,7 @@ export interface AreaGroup {
   id: string;
   name: string;
   lastAccessed?: number;
+  expireAt?: any;
 }
 
 export interface Mushroom {
@@ -15,4 +16,5 @@ export interface Mushroom {
   note: string;
   isFavorite: boolean;
   color: string;
+  expireAt?: any;
 }

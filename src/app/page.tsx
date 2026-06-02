@@ -3,8 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Minus, ExternalLink, Trash2, RotateCcw, Clock, BellRing, Sparkles, Users, Edit3, Check, X, MapPin, Globe, Moon, Sun, ChevronUp, ChevronDown, Copy, LogOut, Share2, Users2, ArrowLeft } from 'lucide-react';
 import { Mushroom, AreaGroup } from '@/types/mushroom';
 import { db, auth } from './firebase';
-import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc, getDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { Preferences } from '@capacitor/preferences';
 
 type Lang = 'zh' | 'en';
 const T = {
@@ -322,6 +323,25 @@ const COLORS = [
   'from-amber-300 to-orange-500 shadow-orange-500/30',
 ];
 
+const safeGetItem = async (key: string): Promise<string | null> => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const { value } = await Preferences.get({ key });
+    return value;
+  } catch (e) {
+    return localStorage.getItem(key);
+  }
+};
+
+const safeSetItem = async (key: string, value: string): Promise<void> => {
+  if (typeof window === 'undefined') return;
+  try {
+    await Preferences.set({ key, value });
+  } catch (e) {
+    localStorage.setItem(key, value);
+  }
+};
+
 export default function PikminDashboard() {
   const [mushrooms, setMushrooms] = useState<Mushroom[]>([]);
   const [groups, setGroups] = useState<AreaGroup[]>([]);
@@ -354,6 +374,7 @@ export default function PikminDashboard() {
   const [showCopyMessage, setShowCopyMessage] = useState<boolean>(false);
   const [showCodeCopyMessage, setShowCodeCopyMessage] = useState<boolean>(false);
   const [recentRooms, setRecentRooms] = useState<{ id: string; name: string; joinedAt: number }[]>([]);
+  const [roomCreatorId, setRoomCreatorId] = useState<string>("");
 
   const copyToClipboard = (text: string) => {
     if (navigator.clipboard && window.isSecureContext) {
@@ -401,7 +422,7 @@ export default function PikminDashboard() {
         { id: cleanCode, name: name || "共享房間", joinedAt: Date.now() },
         ...filtered
       ].slice(0, 5);
-      localStorage.setItem('pikmin_recent_rooms', JSON.stringify(updated));
+      safeSetItem('pikmin_recent_rooms', JSON.stringify(updated));
       return updated;
     });
   };
@@ -411,7 +432,7 @@ export default function PikminDashboard() {
     const cleanCode = code.toUpperCase();
     setRecentRooms(prev => {
       const updated = prev.filter(r => r.id !== cleanCode);
-      localStorage.setItem('pikmin_recent_rooms', JSON.stringify(updated));
+      safeSetItem('pikmin_recent_rooms', JSON.stringify(updated));
       return updated;
     });
   };
@@ -438,33 +459,37 @@ export default function PikminDashboard() {
 
   // 2. Language & Theme setup on mount
   useEffect(() => {
-    const savedLang = localStorage.getItem('pikmin_lang') as Lang;
-    const savedTheme = localStorage.getItem('pikmin_theme') as 'light' | 'dark' | null;
-    const savedRecent = localStorage.getItem('pikmin_recent_rooms');
-    if (savedRecent) {
-      try {
-        setRecentRooms(JSON.parse(savedRecent));
-      } catch (e) {
-        console.error(e);
+    const initStorage = async () => {
+      const savedLang = await safeGetItem('pikmin_lang') as Lang;
+      const savedTheme = await safeGetItem('pikmin_theme') as 'light' | 'dark' | null;
+      const savedRecent = await safeGetItem('pikmin_recent_rooms');
+      if (savedRecent) {
+        try {
+          setRecentRooms(JSON.parse(savedRecent));
+        } catch (e) {
+          console.error(e);
+        }
       }
-    }
 
-    if (savedLang && (savedLang === 'zh' || savedLang === 'en')) {
-      setLang(savedLang);
-    }
+      if (savedLang && (savedLang === 'zh' || savedLang === 'en')) {
+        setLang(savedLang);
+      }
 
-    let initialTheme: 'light' | 'dark' = 'light';
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      initialTheme = savedTheme;
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      initialTheme = 'dark';
-    }
-    setTheme(initialTheme);
-    if (initialTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+      let initialTheme: 'light' | 'dark' = 'light';
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        initialTheme = savedTheme;
+      } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        initialTheme = 'dark';
+      }
+      setTheme(initialTheme);
+      if (initialTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    initStorage();
 
     const timer = setInterval(() => setNow(Date.now()), 1000);
     
@@ -478,76 +503,88 @@ export default function PikminDashboard() {
   useEffect(() => {
     if (!userId || isRestored.current) return;
     isRestored.current = true;
-    const params = new URLSearchParams(window.location.search);
-    const roomParam = params.get('room');
-    if (roomParam) {
-      const code = roomParam.trim().toUpperCase();
-      if (code.length === 6) {
-        joinRoom(code);
-      }
-    } else {
-      const savedRoomId = localStorage.getItem('pikmin_active_room');
-      if (savedRoomId) {
-        if (savedRoomId === "local") {
-          setRoomId("local");
-        } else if (savedRoomId.trim().toUpperCase().length === 6) {
-          joinRoom(savedRoomId.trim().toUpperCase());
+
+    const restoreRoom = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const roomParam = params.get('room');
+      if (roomParam) {
+        const code = roomParam.trim().toUpperCase();
+        if (code.length === 6) {
+          await joinRoom(code);
+        }
+      } else {
+        const savedRoomId = await safeGetItem('pikmin_active_room');
+        if (savedRoomId) {
+          if (savedRoomId === "local") {
+            setRoomId("local");
+          } else if (savedRoomId.trim().toUpperCase().length === 6) {
+            await joinRoom(savedRoomId.trim().toUpperCase());
+          }
         }
       }
-    }
+    };
+
+    restoreRoom();
   }, [userId]);
 
-  // 4. Load from LocalStorage if roomId === "local"
+  // 4. Load from LocalStorage/Preferences if roomId === "local"
   useEffect(() => {
     if (roomId !== "local") return;
-    const savedMs = localStorage.getItem('pikmin_mushrooms');
-    const savedGroups = localStorage.getItem('pikmin_groups');
-    
-    let initialGroups: AreaGroup[] = [{ id: 'default', name: lang === 'en' ? 'Home' : '首頁', lastAccessed: Date.now() }];
-    if (savedGroups) {
-      try {
-        initialGroups = JSON.parse(savedGroups);
-        initialGroups.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
-      } catch (e) {
-        console.error(e);
+
+    const loadLocalData = async () => {
+      const savedMs = await safeGetItem('pikmin_mushrooms');
+      const savedGroups = await safeGetItem('pikmin_groups');
+      
+      let initialGroups: AreaGroup[] = [{ id: 'default', name: lang === 'en' ? 'Home' : '首頁', lastAccessed: Date.now() }];
+      if (savedGroups) {
+        try {
+          initialGroups = JSON.parse(savedGroups);
+          initialGroups.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+        } catch (e) {
+          console.error(e);
+        }
       }
-    }
-    setGroups(initialGroups);
-    const savedActiveGroup = localStorage.getItem('pikmin_active_group_id');
-    const groupExists = savedActiveGroup && initialGroups.some(g => g.id === savedActiveGroup);
-    setActiveGroupId(groupExists ? savedActiveGroup : initialGroups[0].id);
-    if (savedMs) {
-      try {
-        setMushrooms(JSON.parse(savedMs));
-      } catch (e) {
-        console.error(e);
+      setGroups(initialGroups);
+
+      const savedActiveGroup = await safeGetItem('pikmin_active_group_id');
+      const groupExists = savedActiveGroup && initialGroups.some(g => g.id === savedActiveGroup);
+      setActiveGroupId(groupExists ? (savedActiveGroup as string) : initialGroups[0].id);
+
+      if (savedMs) {
+        try {
+          setMushrooms(JSON.parse(savedMs));
+        } catch (e) {
+          console.error(e);
+        }
       }
-    }
+    };
+
+    loadLocalData();
   }, [roomId]);
 
-  // 5. Save to LocalStorage if roomId === "local"
+  // 5. Save to LocalStorage/Preferences if roomId === "local"
   useEffect(() => {
     if (roomId !== "local") return;
-    localStorage.setItem('pikmin_mushrooms', JSON.stringify(mushrooms));
-    localStorage.setItem('pikmin_groups', JSON.stringify(groups));
+    safeSetItem('pikmin_mushrooms', JSON.stringify(mushrooms));
+    safeSetItem('pikmin_groups', JSON.stringify(groups));
   }, [mushrooms, groups, roomId]);
 
   // 5.5 Save language preference unconditionally on change
   useEffect(() => {
-    localStorage.setItem('pikmin_lang', lang);
+    safeSetItem('pikmin_lang', lang);
   }, [lang]);
 
   // Save active room preference unconditionally on change
   useEffect(() => {
     if (isRestored.current) {
-      localStorage.setItem('pikmin_active_room', roomId);
+      safeSetItem('pikmin_active_room', roomId);
     }
   }, [roomId]);
 
   // Save active group preference unconditionally on change
   useEffect(() => {
     if (activeGroupId) {
-      localStorage.setItem('pikmin_active_group_id', activeGroupId);
+      safeSetItem('pikmin_active_group_id', activeGroupId);
     }
   }, [activeGroupId]);
 
@@ -625,6 +662,7 @@ export default function PikminDashboard() {
         const rName = data.name || "共享房間";
         setRoomName(rName);
         setRoomId(code);
+        setRoomCreatorId(data.creatorId || "");
         saveRecentRoom(code, rName);
         
         // Update URL query parameters
@@ -657,18 +695,21 @@ export default function PikminDashboard() {
       await setDoc(roomRef, {
         name: trimmed,
         createdAt: Date.now(),
-        creatorId: userId
+        creatorId: userId,
+        expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       });
       
       const defaultGroup = {
         id: "default",
         name: lang === 'zh' ? '首頁' : 'Home',
-        lastAccessed: Date.now()
+        lastAccessed: Date.now(),
+        expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       };
       await setDoc(doc(db, "rooms", code, "groups", "default"), defaultGroup);
       
       setRoomName(trimmed);
       setRoomId(code);
+      setRoomCreatorId(userId);
       saveRecentRoom(code, trimmed);
       
       const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + `?room=${code}`;
@@ -685,9 +726,65 @@ export default function PikminDashboard() {
     setRoomId("");
     setRoomName("");
     setRoomError("");
+    setRoomCreatorId("");
     // Clean query parameters
     const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
     window.history.replaceState({ path: newUrl }, '', newUrl);
+  };
+
+  const deleteRoom = async () => {
+    if (!roomId || roomId === "local") return;
+    const isOwner = roomCreatorId === userId;
+    if (!isOwner) return;
+
+    const confirmMsg = lang === 'zh' 
+      ? "⚠️ 確定要刪除整個房間嗎？此動作將會清除本房間所有的區域與蘑菇紀錄，且無法復原！" 
+      : "⚠️ Are you sure you want to delete this entire room? This will wipe out all areas and mushrooms in this room and cannot be undone!";
+      
+    if (!window.confirm(confirmMsg)) return;
+
+    setLoadingRoom(true);
+    try {
+      // 1. Delete all mushrooms
+      const mushroomsRef = collection(db, "rooms", roomId, "mushrooms");
+      const mushroomsSnap = await getDocs(mushroomsRef);
+      const batch = writeBatch(db);
+      mushroomsSnap.forEach(d => {
+        batch.delete(d.ref);
+      });
+
+      // 2. Delete all groups
+      const groupsRef = collection(db, "rooms", roomId, "groups");
+      const groupsSnap = await getDocs(groupsRef);
+      groupsSnap.forEach(d => {
+        batch.delete(d.ref);
+      });
+
+      // 3. Delete the room itself
+      batch.delete(doc(db, "rooms", roomId));
+
+      // Commit the batch
+      await batch.commit();
+
+      // 4. Clean up recent rooms list in local storage
+      setRecentRooms(prev => {
+        const updated = prev.filter(r => r.id !== roomId);
+        safeSetItem('pikmin_recent_rooms', JSON.stringify(updated));
+        return updated;
+      });
+
+      // 5. Exit room
+      exitRoom();
+      
+      const successMsg = lang === 'zh' ? "房間已成功刪除！" : "Room deleted successfully!";
+      alert(successMsg);
+    } catch (err) {
+      console.error("Delete room error:", err);
+      const errMsg = lang === 'zh' ? "刪除房間失敗，請稍後再試" : "Failed to delete room. Please try again.";
+      setRoomError(errMsg);
+    } finally {
+      setLoadingRoom(false);
+    }
   };
 
   // 9. Data modifiers
@@ -711,7 +808,10 @@ export default function PikminDashboard() {
     if (roomId === "local") {
       setMushrooms([...mushrooms, newMs]);
     } else {
-      await setDoc(doc(db, "rooms", roomId, "mushrooms", newMs.id), newMs);
+      await setDoc(doc(db, "rooms", roomId, "mushrooms", newMs.id), {
+        ...newMs,
+        expireAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+      });
     }
   };
 
@@ -719,7 +819,10 @@ export default function PikminDashboard() {
     if (roomId === "local") {
       setMushrooms(mushrooms.map(m => m.id === id ? { ...m, ...updates } : m));
     } else {
-      await updateDoc(doc(db, "rooms", roomId, "mushrooms", id), updates);
+      await updateDoc(doc(db, "rooms", roomId, "mushrooms", id), {
+        ...updates,
+        expireAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+      });
     }
   };
 
@@ -741,7 +844,10 @@ export default function PikminDashboard() {
     if (roomId === "local") {
       setGroups(updatedGroups.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0)));
     } else {
-      await updateDoc(doc(db, "rooms", roomId, "groups", id), { lastAccessed: Date.now() });
+      await updateDoc(doc(db, "rooms", roomId, "groups", id), { 
+        lastAccessed: Date.now(),
+        expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      });
     }
   };
 
@@ -763,7 +869,10 @@ export default function PikminDashboard() {
       setGroups(prev => [newGroup, ...prev]);
       setActiveGroupId(newGroup.id);
     } else {
-      await setDoc(doc(db, "rooms", roomId, "groups", newGroup.id), newGroup);
+      await setDoc(doc(db, "rooms", roomId, "groups", newGroup.id), {
+        ...newGroup,
+        expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      });
       setActiveGroupId(newGroup.id);
     }
     setIsAddingGroup(false);
@@ -787,7 +896,10 @@ export default function PikminDashboard() {
       if (roomId === "local") {
         setGroups(groups.map(g => g.id === id ? { ...g, name: trimmed } : g));
       } else {
-        await updateDoc(doc(db, "rooms", roomId, "groups", id), { name: trimmed });
+        await updateDoc(doc(db, "rooms", roomId, "groups", id), { 
+          name: trimmed,
+          expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        });
       }
     }
     setEditingGroupId(null);
@@ -826,7 +938,7 @@ export default function PikminDashboard() {
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(nextTheme);
-    localStorage.setItem('pikmin_theme', nextTheme);
+    safeSetItem('pikmin_theme', nextTheme);
     if (nextTheme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -1087,6 +1199,15 @@ export default function PikminDashboard() {
                 <Share2 size={12} />
                 <span>{showCopyMessage ? t.copiedLink : t.copyLinkBtn}</span>
               </button>
+              {roomCreatorId === userId && (
+                <button 
+                  onClick={deleteRoom}
+                  className="p-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full transition-all active:scale-95 hover:scale-105 shrink-0"
+                  title={lang === 'zh' ? '刪除整個房間' : 'Delete entire room'}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
               <button 
                 onClick={exitRoom}
                 className="p-1.5 bg-white/20 hover:bg-white/30 text-white rounded-full transition-all active:scale-95 hover:scale-105 shrink-0"
