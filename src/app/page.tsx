@@ -991,11 +991,11 @@ export default function PikminDashboard() {
 
   if (!roomId) {
     return (
-      <main 
-        className={`min-h-screen bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 p-4 flex items-center justify-center font-sans transition-all duration-500 ${theme}`}
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
-      >
-        <div className="absolute top-4 right-4 flex gap-2">
+      <main className={`min-h-screen bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 p-4 flex items-center justify-center font-sans transition-all duration-500 ${theme}`}>
+        <div 
+          className="absolute right-4 flex gap-2"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+        >
           <button onClick={toggleTheme} className="p-2.5 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-600 dark:text-slate-300 active:scale-95 hover:scale-105 transition-all border border-stone-200/10" title="切換主題">
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
