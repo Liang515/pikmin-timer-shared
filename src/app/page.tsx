@@ -991,10 +991,10 @@ export default function PikminDashboard() {
 
   if (!roomId) {
     return (
-      <main className={`min-h-screen bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 p-4 flex items-center justify-center font-sans transition-all duration-500 ${theme}`}>
+      <main className={`min-h-screen bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 px-4 flex flex-col font-sans transition-all duration-500 ${theme}`}>
         <div 
-          className="absolute right-4 flex gap-2"
-          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+          className="w-full max-w-md mx-auto flex justify-end gap-2 z-50 shrink-0"
+          style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)', paddingBottom: '12px' }}
         >
           <button onClick={toggleTheme} className="p-2.5 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-600 dark:text-slate-300 active:scale-95 hover:scale-105 transition-all border border-stone-200/10" title="切換主題">
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
@@ -1004,7 +1004,11 @@ export default function PikminDashboard() {
           </button>
         </div>
 
-        <div className="w-full max-w-md bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-stone-200/60 dark:border-slate-800/80 shadow-xl rounded-[2.5rem] p-6 sm:p-8 animate-in zoom-in-95 duration-300 relative overflow-hidden">
+        <div className="flex-1 flex items-center justify-center py-4">
+          <div 
+            className="w-full max-w-md bg-white/70 dark:bg-slate-900/60 backdrop-blur-md border border-stone-200/60 dark:border-slate-800/80 shadow-xl rounded-[2.5rem] p-6 sm:p-8 animate-in zoom-in-95 duration-300 relative overflow-hidden isolate"
+            style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
+          >
           {/* Decorative background lights */}
           <div className="absolute -top-12 -left-12 w-28 h-28 bg-emerald-400/10 dark:bg-emerald-400/5 rounded-full blur-2xl pointer-events-none" />
           <div className="absolute -bottom-12 -right-12 w-28 h-28 bg-amber-400/10 dark:bg-amber-400/5 rounded-full blur-2xl pointer-events-none" />
@@ -1130,7 +1134,8 @@ export default function PikminDashboard() {
             </div>
           )}
         </div>
-      </main>
+      </div>
+    </main>
     );
   }
 
@@ -1699,7 +1704,10 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
   }
 
   return (
-    <div className={`p-5 rounded-3xl transition-all duration-300 ease-out hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] relative overflow-hidden flex flex-col sm:flex-row justify-between items-center gap-4 ${cardClass}`}>
+    <div 
+      className={`p-5 rounded-3xl transition-all duration-300 ease-out hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] relative overflow-hidden flex flex-col sm:flex-row justify-between items-center gap-4 isolate ${cardClass}`}
+      style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
+    >
       <div className="flex flex-col items-start w-full sm:w-auto">
         <h3 className={`text-xl font-bold flex flex-wrap items-center gap-2 ${isOver ? 'text-slate-800 dark:text-slate-200' : 'text-white'}`}>
           {m.name}
