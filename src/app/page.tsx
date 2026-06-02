@@ -523,7 +523,7 @@ export default function PikminDashboard() {
 
   // 3. Check URL parameters for ?room=X9W3R2 or restore saved active room
   useEffect(() => {
-    if (!userId || isRestoredState) return;
+    if (isRestoredState) return;
 
     const restoreRoom = async () => {
       try {
@@ -552,7 +552,7 @@ export default function PikminDashboard() {
     };
 
     restoreRoom();
-  }, [userId, isRestoredState]);
+  }, [isRestoredState]);
 
   // 4. Load from LocalStorage/Preferences if roomId === "local"
   useEffect(() => {
