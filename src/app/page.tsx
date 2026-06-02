@@ -991,7 +991,10 @@ export default function PikminDashboard() {
 
   if (!roomId) {
     return (
-      <main className={`min-h-screen bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 p-4 flex items-center justify-center font-sans transition-all duration-500 ${theme}`}>
+      <main 
+        className={`min-h-screen bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 p-4 flex items-center justify-center font-sans transition-all duration-500 ${theme}`}
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+      >
         <div className="absolute top-4 right-4 flex gap-2">
           <button onClick={toggleTheme} className="p-2.5 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-600 dark:text-slate-300 active:scale-95 hover:scale-105 transition-all border border-stone-200/10" title="切換主題">
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
@@ -1132,7 +1135,10 @@ export default function PikminDashboard() {
   }
 
   return (
-    <main className={`min-h-screen bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 p-3 sm:p-4 pb-24 md:p-8 font-sans transition-all duration-500 ${theme}`}>
+    <main 
+      className={`min-h-screen bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 p-3 sm:p-4 pb-24 md:p-8 font-sans transition-all duration-500 ${theme}`}
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+    >
       <header className="flex justify-between items-center mb-4 sm:mb-6 max-w-2xl mx-auto bg-white/40 dark:bg-slate-900/40 backdrop-blur-md px-4 py-3 rounded-full border border-stone-200/40 dark:border-slate-800/40 shadow-sm">
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center shadow-inner shrink-0">
