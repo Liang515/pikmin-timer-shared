@@ -391,6 +391,7 @@ export default function PikminDashboard() {
   };
 
   const notifiedSet = useRef<Set<string>>(new Set());
+  const isRestored = useRef(false);
 
   const saveRecentRoom = (code: string, name: string) => {
     const cleanCode = code.toUpperCase();
@@ -475,7 +476,8 @@ export default function PikminDashboard() {
 
   // 3. Check URL parameters for ?room=X9W3R2 or restore saved active room
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || isRestored.current) return;
+    isRestored.current = true;
     const params = new URLSearchParams(window.location.search);
     const roomParam = params.get('room');
     if (roomParam) {
@@ -537,7 +539,9 @@ export default function PikminDashboard() {
 
   // Save active room preference unconditionally on change
   useEffect(() => {
-    localStorage.setItem('pikmin_active_room', roomId);
+    if (isRestored.current) {
+      localStorage.setItem('pikmin_active_room', roomId);
+    }
   }, [roomId]);
 
   // Save active group preference unconditionally on change
