@@ -473,7 +473,7 @@ export default function PikminDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // 3. Check URL parameters for ?room=X9W3R2
+  // 3. Check URL parameters for ?room=X9W3R2 or restore saved active room
   useEffect(() => {
     if (!userId) return;
     const params = new URLSearchParams(window.location.search);
@@ -482,6 +482,15 @@ export default function PikminDashboard() {
       const code = roomParam.trim().toUpperCase();
       if (code.length === 6) {
         joinRoom(code);
+      }
+    } else {
+      const savedRoomId = localStorage.getItem('pikmin_active_room');
+      if (savedRoomId) {
+        if (savedRoomId === "local") {
+          setRoomId("local");
+        } else if (savedRoomId.trim().toUpperCase().length === 6) {
+          joinRoom(savedRoomId.trim().toUpperCase());
+        }
       }
     }
   }, [userId]);
@@ -502,7 +511,9 @@ export default function PikminDashboard() {
       }
     }
     setGroups(initialGroups);
-    setActiveGroupId(initialGroups[0].id);
+    const savedActiveGroup = localStorage.getItem('pikmin_active_group_id');
+    const groupExists = savedActiveGroup && initialGroups.some(g => g.id === savedActiveGroup);
+    setActiveGroupId(groupExists ? savedActiveGroup : initialGroups[0].id);
     if (savedMs) {
       try {
         setMushrooms(JSON.parse(savedMs));
@@ -523,6 +534,18 @@ export default function PikminDashboard() {
   useEffect(() => {
     localStorage.setItem('pikmin_lang', lang);
   }, [lang]);
+
+  // Save active room preference unconditionally on change
+  useEffect(() => {
+    localStorage.setItem('pikmin_active_room', roomId);
+  }, [roomId]);
+
+  // Save active group preference unconditionally on change
+  useEffect(() => {
+    if (activeGroupId) {
+      localStorage.setItem('pikmin_active_group_id', activeGroupId);
+    }
+  }, [activeGroupId]);
 
   // 6. Push local notifications for timers
   useEffect(() => {
@@ -558,8 +581,14 @@ export default function PikminDashboard() {
       if (list.length > 0) {
         setGroups(list);
         setActiveGroupId(prevActive => {
-          const exists = list.some(g => g.id === prevActive);
-          return exists ? prevActive : list[0].id;
+          if (prevActive && list.some(g => g.id === prevActive)) {
+            return prevActive;
+          }
+          const savedActiveGroup = localStorage.getItem('pikmin_active_group_id');
+          if (savedActiveGroup && list.some(g => g.id === savedActiveGroup)) {
+            return savedActiveGroup;
+          }
+          return list[0].id;
         });
       }
     });
