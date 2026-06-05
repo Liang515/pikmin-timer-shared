@@ -15,8 +15,10 @@ const T = {
     home: '首頁',
     battleEnded: '⚔️ 戰鬥結束！',
     battleEndedBody: (name: string) => `${name} 的戰鬥已完成，5分鐘後重生。`,
-    respawned: '🍄 蘑菇即將重生！',
-    respawnedBody: (name: string) => `${name} 將於 1 分鐘後重生！`,
+    respawnSoon: '🍄 蘑菇即將重生！',
+    respawnSoonBody: (name: string) => `${name} 將於 1 分鐘後重生！`,
+    respawned: '🍄 蘑菇已重生！',
+    respawnedBody: (name: string) => `${name} 已經重生完畢！`,
     defaultMushroom: '蘑菇',
     enterArea: '請輸入區域名稱:',
     newArea: '新區域',
@@ -79,8 +81,10 @@ const T = {
     home: 'Home',
     battleEnded: '⚔️ Battle Ended!',
     battleEndedBody: (name: string) => `${name} battle completed. Respawning in 5 mins.`,
-    respawned: '🍄 Mushroom Respawning Soon!',
-    respawnedBody: (name: string) => `${name} will respawn in 1 minute!`,
+    respawnSoon: '🍄 Mushroom Respawning Soon!',
+    respawnSoonBody: (name: string) => `${name} will respawn in 1 minute!`,
+    respawned: '🍄 Mushroom Respawned!',
+    respawnedBody: (name: string) => `${name} has respawned!`,
     defaultMushroom: 'Mushroom',
     enterArea: 'Enter area name:',
     newArea: 'New Area',
@@ -653,7 +657,13 @@ export default function PikminDashboard() {
           new Notification(T[lang].battleEnded, { body: T[lang].battleEndedBody(m.name) });
         }
       }
-      if (now >= rTime && !notifiedSet.current.has(m.id + '_respawn')) {
+      if (now >= rTime && !notifiedSet.current.has(m.id + '_soon')) {
+        notifiedSet.current.add(m.id + '_soon');
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(T[lang].respawnSoon, { body: T[lang].respawnSoonBody(m.name) });
+        }
+      }
+      if (now >= m.endTime && !notifiedSet.current.has(m.id + '_respawn')) {
         notifiedSet.current.add(m.id + '_respawn');
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification(T[lang].respawned, { body: T[lang].respawnedBody(m.name) });
@@ -687,7 +697,7 @@ export default function PikminDashboard() {
             list.push({
               title: T[lang].battleEnded,
               body: T[lang].battleEndedBody(m.name),
-              id: baseId * 2,
+              id: baseId * 3,
               schedule: { at: new Date(bEnd) },
               sound: 'default'
             });
@@ -696,10 +706,21 @@ export default function PikminDashboard() {
           // Notification 2: Respawning Soon (1 minute before respawn)
           if (rTime > Date.now()) {
             list.push({
+              title: T[lang].respawnSoon,
+              body: T[lang].respawnSoonBody(m.name),
+              id: baseId * 3 + 1,
+              schedule: { at: new Date(rTime) },
+              sound: 'default'
+            });
+          }
+
+          // Notification 3: Respawned (0 minutes before respawn)
+          if (m.endTime > Date.now()) {
+            list.push({
               title: T[lang].respawned,
               body: T[lang].respawnedBody(m.name),
-              id: baseId * 2 + 1,
-              schedule: { at: new Date(rTime) },
+              id: baseId * 3 + 2,
+              schedule: { at: new Date(m.endTime) },
               sound: 'default'
             });
           }
@@ -938,6 +959,7 @@ export default function PikminDashboard() {
 
   const deleteMushroom = async (id: string) => {
     notifiedSet.current.delete(id + '_battle');
+    notifiedSet.current.delete(id + '_soon');
     notifiedSet.current.delete(id + '_respawn');
     if (editingId === id) setEditingId(null);
 
@@ -1578,6 +1600,7 @@ export default function PikminDashboard() {
             onUpdate={updateMushroom}
             onResetNote={() => {
               notifiedSet.current.delete(m.id + '_battle');
+              notifiedSet.current.delete(m.id + '_soon');
               notifiedSet.current.delete(m.id + '_respawn');
             }}
           />
