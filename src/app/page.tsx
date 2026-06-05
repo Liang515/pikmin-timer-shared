@@ -6,6 +6,8 @@ import { db, auth } from './firebase';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc, getDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { Preferences } from '@capacitor/preferences';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 type Lang = 'zh' | 'en';
 const T = {
@@ -13,8 +15,8 @@ const T = {
     home: '首頁',
     battleEnded: '⚔️ 戰鬥結束！',
     battleEndedBody: (name: string) => `${name} 的戰鬥已完成，5分鐘後重生。`,
-    respawned: '🍄 蘑菇已重生！',
-    respawnedBody: (name: string) => `${name} 已經重生完畢！`,
+    respawned: '🍄 蘑菇即將重生！',
+    respawnedBody: (name: string) => `${name} 將於 1 分鐘後重生！`,
     defaultMushroom: '蘑菇',
     enterArea: '請輸入區域名稱:',
     newArea: '新區域',
@@ -77,8 +79,8 @@ const T = {
     home: 'Home',
     battleEnded: '⚔️ Battle Ended!',
     battleEndedBody: (name: string) => `${name} battle completed. Respawning in 5 mins.`,
-    respawned: '🍄 Mushroom Respawned!',
-    respawnedBody: (name: string) => `${name} has respawned!`,
+    respawned: '🍄 Mushroom Respawning Soon!',
+    respawnedBody: (name: string) => `${name} will respawn in 1 minute!`,
     defaultMushroom: 'Mushroom',
     enterArea: 'Enter area name:',
     newArea: 'New Area',
@@ -315,6 +317,16 @@ function ParticipantSlider({ value, onChange }: {
   );
 }
 
+const stringToHash = (str: string): number => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  return Math.abs(hash) % 1000000000;
+};
+
 const COLORS = [
   'from-blue-400 to-indigo-500 shadow-blue-500/30',
   'from-purple-400 to-fuchsia-500 shadow-purple-500/30',
@@ -518,6 +530,21 @@ export default function PikminDashboard() {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
+
+    const requestNativeNotificationPerm = async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const perm = await LocalNotifications.checkPermissions();
+          if (perm.display !== 'granted') {
+            await LocalNotifications.requestPermissions();
+          }
+        }
+      } catch (e) {
+        console.error("LocalNotifications permission check failed:", e);
+      }
+    };
+    requestNativeNotificationPerm();
+
     return () => clearInterval(timer);
   }, []);
 
@@ -615,17 +642,18 @@ export default function PikminDashboard() {
     }
   }, [activeGroupId, isRestoredState]);
 
-  // 6. Push local notifications for timers
+  // 6. Push local notifications for timers (Web browser)
   useEffect(() => {
     mushrooms.forEach(m => {
       const bEnd = m.battleEndTime || (m.endTime - 5 * 60000);
+      const rTime = m.endTime - 1 * 60000;
       if (now >= bEnd && !notifiedSet.current.has(m.id + '_battle')) {
         notifiedSet.current.add(m.id + '_battle');
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification(T[lang].battleEnded, { body: T[lang].battleEndedBody(m.name) });
         }
       }
-      if (now >= m.endTime && !notifiedSet.current.has(m.id + '_respawn')) {
+      if (now >= rTime && !notifiedSet.current.has(m.id + '_respawn')) {
         notifiedSet.current.add(m.id + '_respawn');
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification(T[lang].respawned, { body: T[lang].respawnedBody(m.name) });
@@ -633,6 +661,61 @@ export default function PikminDashboard() {
       }
     });
   }, [mushrooms, now, lang]);
+
+  // 6.5 Schedule Capacitor native local notifications when mushrooms change (Native App)
+  useEffect(() => {
+    const syncNativeNotifications = async () => {
+      try {
+        if (!Capacitor.isNativePlatform()) return;
+
+        // 1. Cancel all pending notifications
+        const pending = await LocalNotifications.getPending();
+        if (pending.notifications.length > 0) {
+          await LocalNotifications.cancel(pending);
+        }
+
+        // 2. Schedule new notifications
+        const list: any[] = [];
+        mushrooms.forEach(m => {
+          const bEnd = m.battleEndTime || (m.endTime - 5 * 60000);
+          const rTime = m.endTime - 1 * 60000;
+
+          const baseId = stringToHash(m.id);
+
+          // Notification 1: Battle Ended (5 minutes before respawn)
+          if (bEnd > Date.now()) {
+            list.push({
+              title: T[lang].battleEnded,
+              body: T[lang].battleEndedBody(m.name),
+              id: baseId * 2,
+              schedule: { at: new Date(bEnd) },
+              sound: 'default'
+            });
+          }
+
+          // Notification 2: Respawning Soon (1 minute before respawn)
+          if (rTime > Date.now()) {
+            list.push({
+              title: T[lang].respawned,
+              body: T[lang].respawnedBody(m.name),
+              id: baseId * 2 + 1,
+              schedule: { at: new Date(rTime) },
+              sound: 'default'
+            });
+          }
+        });
+
+        if (list.length > 0) {
+          await LocalNotifications.schedule({ notifications: list });
+          console.log(`[Notification] Scheduled ${list.length} native notifications`);
+        }
+      } catch (e) {
+        console.error("Failed to schedule native local notifications:", e);
+      }
+    };
+
+    syncNativeNotifications();
+  }, [mushrooms, lang]);
 
   // 7. Subscribe to Firestore if roomId is active
   useEffect(() => {
