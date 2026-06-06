@@ -163,7 +163,7 @@ function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter,
   const [mStr, setMStr] = useState(m === 0 ? "" : m.toString());
   const [sStr, setSStr] = useState(s === 0 ? "" : s.toString());
 
-  // Sync inputs if parent values change (such as when clicking preset buttons like 15m/30m/1h)
+  // Sync inputs if parent values change
   useEffect(() => {
     setHStr(h === 0 ? "" : h.toString());
     setMStr(m === 0 ? "" : m.toString());
@@ -180,53 +180,31 @@ function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter,
   }, []);
 
   const presets = [
-    { label: lang === 'zh' ? '1小時' : '1h', type: 'h', value: 1 },
-    { label: lang === 'zh' ? '2小時' : '2h', type: 'h', value: 2 },
-    { label: lang === 'zh' ? '3小時' : '3h', type: 'h', value: 3 },
-    { label: lang === 'zh' ? '4小時' : '4h', type: 'h', value: 4 },
-    { label: lang === 'zh' ? '5小時' : '5h', type: 'h', value: 5 },
-    { label: lang === 'zh' ? '6小時' : '6h', type: 'h', value: 6 },
-    { label: lang === 'zh' ? '8小時' : '8h', type: 'h', value: 8 },
-    { label: lang === 'zh' ? '15分' : '15m', type: 'm', value: 15 },
-    { label: lang === 'zh' ? '30分' : '30m', type: 'm', value: 30 },
-    { label: lang === 'zh' ? '45分' : '45m', type: 'm', value: 45 },
+    { label: lang === 'zh' ? '1小時' : '1h', value: 1 },
+    { label: lang === 'zh' ? '2小時' : '2h', value: 2 },
+    { label: lang === 'zh' ? '3小時' : '3h', value: 3 },
   ];
 
-  const isActive = (preset: typeof presets[0]) => {
-    if (preset.type === 'h') {
-      return h === preset.value && m === 0 && s === 0;
-    } else {
-      return h === 0 && m === preset.value && s === 0;
-    }
-  };
-
   const handlePresetClick = (preset: typeof presets[0]) => {
-    if (preset.type === 'h') {
-      onChangeH(preset.value);
-      onChangeM(0);
-      onChangeS(0);
-      setHStr(preset.value.toString());
-      setMStr("");
-      setSStr("");
+    onChangeH(preset.value);
+    onChangeM(0);
+    onChangeS(0);
+    setHStr(preset.value.toString());
+    setMStr("");
+    setSStr("");
+    
+    // Focus and select synchronously so iOS triggers numeric keyboard
+    if (mRef.current) {
+      mRef.current.focus();
+      mRef.current.select();
+    }
+
+    // Scroll card into view
+    const card = mRef.current?.closest('.edit-mushroom-card');
+    if (card) {
       setTimeout(() => {
-        if (mRef.current) {
-          mRef.current.focus();
-          mRef.current.select();
-        }
-      }, 50);
-    } else if (preset.type === 'm') {
-      onChangeH(0);
-      onChangeM(preset.value);
-      onChangeS(0);
-      setHStr("");
-      setMStr(preset.value.toString());
-      setSStr("");
-      setTimeout(() => {
-        if (sRef.current) {
-          sRef.current.focus();
-          sRef.current.select();
-        }
-      }, 50);
+        card.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 250);
     }
   };
 
@@ -271,18 +249,28 @@ function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter,
     }
   };
 
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.select();
+    const card = e.target.closest('.edit-mushroom-card');
+    if (card) {
+      setTimeout(() => {
+        card.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 250);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-3 w-full">
       {/* Quick Presets */}
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start">
         {presets.map(p => {
-          const active = isActive(p);
+          const active = h === p.value && m === 0 && s === 0;
           return (
             <button
               key={p.label}
               type="button"
               onClick={() => handlePresetClick(p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95 transition-all ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95 transition-all ${
                 active
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
                   : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/40 dark:border-slate-700/50'
@@ -305,6 +293,7 @@ function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter,
             value={hStr}
             onChange={e => handleInputChange(e.target.value, 23, setHStr, onChangeH, mRef)}
             onKeyDown={e => handleKeyDown(e)}
+            onFocus={handleFocus}
             placeholder="00"
             className="w-full text-center text-2xl font-mono font-bold bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-xl py-2 outline-none text-slate-800 dark:text-slate-100 transition-colors shadow-sm focus:shadow-md"
           />
@@ -322,6 +311,7 @@ function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter,
             value={mStr}
             onChange={e => handleInputChange(e.target.value, 59, setMStr, onChangeM, sRef)}
             onKeyDown={e => handleKeyDown(e, hRef)}
+            onFocus={handleFocus}
             placeholder="00"
             className="w-full text-center text-2xl font-mono font-bold bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-xl py-2 outline-none text-slate-800 dark:text-slate-100 transition-colors shadow-sm focus:shadow-md"
           />
@@ -339,6 +329,7 @@ function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter,
             value={sStr}
             onChange={e => handleInputChange(e.target.value, 59, setSStr, onChangeS)}
             onKeyDown={e => handleKeyDown(e, mRef)}
+            onFocus={handleFocus}
             placeholder="00"
             className="w-full text-center text-2xl font-mono font-bold bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-xl py-2 outline-none text-slate-800 dark:text-slate-100 transition-colors shadow-sm focus:shadow-md"
           />
@@ -1767,6 +1758,8 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
   
   const t = T[lang];
 
+  const cardRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (isEditing) {
       setEditP(m.participants);
@@ -1778,6 +1771,12 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
       setEditM(Math.floor((totalSec % 3600) / 60));
       setEditS(totalSec % 60);
       setEditTimeChanged(false);
+
+      // Scroll into view on edit start
+      const timer = setTimeout(() => {
+        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 250);
+      return () => clearTimeout(timer);
     }
   }, [isEditing, m.participants, m.name, m.battleEndTime]);
 
@@ -1815,7 +1814,7 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
 
   if (isEditing) {
     return (
-      <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl shadow-sm border-2 border-blue-500 transition-all text-slate-800 dark:text-slate-100">
+      <div ref={cardRef} className="edit-mushroom-card bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl shadow-sm border-2 border-blue-500 transition-all text-slate-800 dark:text-slate-100">
         <div className="mb-3">
           <input 
             value={editName}
