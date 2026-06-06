@@ -146,12 +146,13 @@ const T = {
 };
 
 /* ─── Keyboard Time Picker Component ─── */
-function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter }: {
+function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter, lang }: {
   h: number; m: number; s: number;
   onChangeH: (v: number) => void;
   onChangeM: (v: number) => void;
   onChangeS: (v: number) => void;
   onEnter?: () => void;
+  lang: Lang;
 }) {
   const hRef = useRef<HTMLInputElement>(null);
   const mRef = useRef<HTMLInputElement>(null);
@@ -177,6 +178,57 @@ function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter 
     }, 150);
     return () => clearTimeout(timer);
   }, []);
+
+  const presets = [
+    { label: lang === 'zh' ? '1小時' : '1h', type: 'h', value: 1 },
+    { label: lang === 'zh' ? '2小時' : '2h', type: 'h', value: 2 },
+    { label: lang === 'zh' ? '3小時' : '3h', type: 'h', value: 3 },
+    { label: lang === 'zh' ? '4小時' : '4h', type: 'h', value: 4 },
+    { label: lang === 'zh' ? '5小時' : '5h', type: 'h', value: 5 },
+    { label: lang === 'zh' ? '6小時' : '6h', type: 'h', value: 6 },
+    { label: lang === 'zh' ? '8小時' : '8h', type: 'h', value: 8 },
+    { label: lang === 'zh' ? '15分' : '15m', type: 'm', value: 15 },
+    { label: lang === 'zh' ? '30分' : '30m', type: 'm', value: 30 },
+    { label: lang === 'zh' ? '45分' : '45m', type: 'm', value: 45 },
+  ];
+
+  const isActive = (preset: typeof presets[0]) => {
+    if (preset.type === 'h') {
+      return h === preset.value && m === 0 && s === 0;
+    } else {
+      return h === 0 && m === preset.value && s === 0;
+    }
+  };
+
+  const handlePresetClick = (preset: typeof presets[0]) => {
+    if (preset.type === 'h') {
+      onChangeH(preset.value);
+      onChangeM(0);
+      onChangeS(0);
+      setHStr(preset.value.toString());
+      setMStr("");
+      setSStr("");
+      setTimeout(() => {
+        if (mRef.current) {
+          mRef.current.focus();
+          mRef.current.select();
+        }
+      }, 50);
+    } else if (preset.type === 'm') {
+      onChangeH(0);
+      onChangeM(preset.value);
+      onChangeS(0);
+      setHStr("");
+      setMStr(preset.value.toString());
+      setSStr("");
+      setTimeout(() => {
+        if (sRef.current) {
+          sRef.current.focus();
+          sRef.current.select();
+        }
+      }, 50);
+    }
+  };
 
   const handleInputChange = (
     val: string,
@@ -220,54 +272,78 @@ function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter 
   };
 
   return (
-    <div className="flex items-center justify-center gap-2 py-3 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800/80 px-4 w-full">
-      <div className="flex flex-col items-center gap-1 flex-1">
-        <input
-          ref={hRef}
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          value={hStr}
-          onChange={e => handleInputChange(e.target.value, 23, setHStr, onChangeH, mRef)}
-          onKeyDown={e => handleKeyDown(e)}
-          placeholder="00"
-          className="w-full text-center text-2xl font-mono font-bold bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-xl py-2 outline-none text-slate-800 dark:text-slate-100 transition-colors shadow-sm focus:shadow-md"
-        />
-        <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">時 (H)</span>
-      </div>
-      
-      <span className="text-2xl font-black text-slate-300 dark:text-slate-700 mb-5">:</span>
-
-      <div className="flex flex-col items-center gap-1 flex-1">
-        <input
-          ref={mRef}
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          value={mStr}
-          onChange={e => handleInputChange(e.target.value, 59, setMStr, onChangeM, sRef)}
-          onKeyDown={e => handleKeyDown(e, hRef)}
-          placeholder="00"
-          className="w-full text-center text-2xl font-mono font-bold bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-xl py-2 outline-none text-slate-800 dark:text-slate-100 transition-colors shadow-sm focus:shadow-md"
-        />
-        <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">分 (M)</span>
+    <div className="flex flex-col gap-3 w-full">
+      {/* Quick Presets */}
+      <div className="flex flex-wrap gap-1.5">
+        {presets.map(p => {
+          const active = isActive(p);
+          return (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => handlePresetClick(p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95 transition-all ${
+                active
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/40 dark:border-slate-700/50'
+              }`}
+            >
+              {p.label}
+            </button>
+          );
+        })}
       </div>
 
-      <span className="text-2xl font-black text-slate-300 dark:text-slate-700 mb-5">:</span>
+      {/* Inputs */}
+      <div className="flex items-center justify-center gap-2 py-3 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-100 dark:border-slate-800/80 px-4 w-full">
+        <div className="flex flex-col items-center gap-1 flex-1">
+          <input
+            ref={hRef}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={hStr}
+            onChange={e => handleInputChange(e.target.value, 23, setHStr, onChangeH, mRef)}
+            onKeyDown={e => handleKeyDown(e)}
+            placeholder="00"
+            className="w-full text-center text-2xl font-mono font-bold bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-xl py-2 outline-none text-slate-800 dark:text-slate-100 transition-colors shadow-sm focus:shadow-md"
+          />
+          <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{lang === 'zh' ? '時 (H)' : 'Hr (H)'}</span>
+        </div>
+        
+        <span className="text-2xl font-black text-slate-300 dark:text-slate-700 mb-5">:</span>
 
-      <div className="flex flex-col items-center gap-1 flex-1">
-        <input
-          ref={sRef}
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          value={sStr}
-          onChange={e => handleInputChange(e.target.value, 59, setSStr, onChangeS)}
-          onKeyDown={e => handleKeyDown(e, mRef)}
-          placeholder="00"
-          className="w-full text-center text-2xl font-mono font-bold bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-xl py-2 outline-none text-slate-800 dark:text-slate-100 transition-colors shadow-sm focus:shadow-md"
-        />
-        <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">秒 (S)</span>
+        <div className="flex flex-col items-center gap-1 flex-1">
+          <input
+            ref={mRef}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={mStr}
+            onChange={e => handleInputChange(e.target.value, 59, setMStr, onChangeM, sRef)}
+            onKeyDown={e => handleKeyDown(e, hRef)}
+            placeholder="00"
+            className="w-full text-center text-2xl font-mono font-bold bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-xl py-2 outline-none text-slate-800 dark:text-slate-100 transition-colors shadow-sm focus:shadow-md"
+          />
+          <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{lang === 'zh' ? '分 (M)' : 'Min (M)'}</span>
+        </div>
+
+        <span className="text-2xl font-black text-slate-300 dark:text-slate-700 mb-5">:</span>
+
+        <div className="flex flex-col items-center gap-1 flex-1">
+          <input
+            ref={sRef}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={sStr}
+            onChange={e => handleInputChange(e.target.value, 59, setSStr, onChangeS)}
+            onKeyDown={e => handleKeyDown(e, mRef)}
+            placeholder="00"
+            className="w-full text-center text-2xl font-mono font-bold bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-xl py-2 outline-none text-slate-800 dark:text-slate-100 transition-colors shadow-sm focus:shadow-md"
+          />
+          <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{lang === 'zh' ? '秒 (S)' : 'Sec (S)'}</span>
+        </div>
       </div>
     </div>
   );
@@ -1649,35 +1725,11 @@ export default function PikminDashboard() {
                  <div className="flex justify-between items-center mb-2">
                    <label className="block text-sm font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1"><Clock size={16}/> {t.remainingTime}</label>
                  </div>
-                 <div className="flex flex-wrap gap-2 mb-3">
-                   {[
-                     { label: t.m15, h: 0, m: 15, s: 0 },
-                     { label: t.m30, h: 0, m: 30, s: 0 },
-                     { label: t.h1, h: 1, m: 0, s: 0 },
-                     { label: t.h3, h: 3, m: 0, s: 0 },
-                     { label: t.h8, h: 8, m: 0, s: 0 },
-                   ].map(p => (
-                     <button 
-                       key={p.label}
-                       onClick={() => {
-                          setAddH(p.h);
-                          setAddM(p.m);
-                          setAddS(p.s);
-                       }}
-                       className={`px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap active:scale-95 transition-all ${
-                         addH === p.h && addM === p.m && addS === p.s
-                           ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
-                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                       }`}
-                     >
-                       {p.label}
-                     </button>
-                   ))}
-                 </div>
                  <KeyboardTimePicker
                     h={addH} m={addM} s={addS}
                     onChangeH={setAddH} onChangeM={setAddM} onChangeS={setAddS}
                     onEnter={handleAddSubmit}
+                    lang={lang}
                   />
                </div>
  
@@ -1750,7 +1802,8 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
       name: editName.trim() || t.defaultMushroom,
       participants: editP 
     };
-    if (editTimeChanged) {
+    const isZero = editH === 0 && editM === 0 && editS === 0;
+    if (editTimeChanged || isZero) {
        const battleMs = (editH*3600 + editM*60 + editS)*1000;
        updates.battleEndTime = Date.now() + battleMs;
        updates.endTime = updates.battleEndTime + 5 * 60 * 1000;
@@ -1781,6 +1834,7 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
             onChangeM={v => { setEditM(v); setEditTimeChanged(true); }}
             onChangeS={v => { setEditS(v); setEditTimeChanged(true); }}
             onEnter={handleEditSubmit}
+            lang={lang}
           />
         </div>
 
