@@ -15,6 +15,10 @@ With this tool, you can create real-time synchronized shared rooms with your exp
 - **One-Click Invite Links**: Automatically generates a dedicated HTTPS link containing the room code (e.g., `?room=X9W3R2`). Tapping the "Copy Invite Link" button copies it to your clipboard for instant sharing in LINE groups. Teammates can tap the link to join directly.
 - **Bidirectional Zero-Latency Updates**: Powered by Google Cloud Firestore real-time data streams. Any member adding an area, updating participant counts, or creating/deleting mushroom timers will trigger instant, zero-latency updates on everyone's screens!
 
+### 🔔 Real-Time & Native Notifications
+- **Dual-Platform Support**: Web version supports standard browser push notifications; Native App version supports iOS system-level local notifications.
+- **Triple Timed Alerts**: Includes "Battle Ended (5m before respawn)", "Respawn Soon (1m before respawn)", and "Respawned Complete", ensuring you and your squad never miss a mushroom!
+
 ### ⏱️ Smart Recent Rooms History
 - The homepage automatically remembers up to 5 rooms that you have recently successfully created or joined.
 - When you reopen the web app, a glassmorphic "⏱️ Recent Rooms" list will appear on the homepage. **Simply tap a room to connect and enter instantly**, without having to repeatedly copy and paste codes!
@@ -92,5 +96,29 @@ This project is completely compatible with Vercel's free Next.js static deployme
    npm run dev
    ```
 3. Open your browser and navigate to [http://localhost:3000](http://localhost:3000) to start testing.
+
+<details>
+<summary>📱 Native iOS App Compiling & Packaging (Capacitor)</summary>
+
+This project has integrated **CapacitorJS**, supporting direct packaging and compiling into a native iOS App with system-level native local notifications (including battle ended, 1-minute before respawn, and respawned complete triple alerts).
+
+### Compiling & Packaging Steps:
+1. **Install Dependencies & Build Web Assets**:
+   ```bash
+   npm install
+   npm run build
+   ```
+2. **Sync Assets to iOS Project**:
+   ```bash
+   npx cap sync ios
+   ```
+3. **Open Project in Xcode** (Requires a Mac with Xcode installed):
+   ```bash
+   npx cap open ios
+   ```
+4. **Run in Xcode**:
+   - Click `App` on the left file navigator. Under the `Signing & Capabilities` tab, check `Automatically manage signing` and select your Apple ID (Team).
+   - Select your iPhone as the destination at the top and click the **▶️ (Run)** button on the top left.
+</details>
 
 Happy mushroom hunting with your adventure squad! 🍄⚔️
