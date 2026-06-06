@@ -146,13 +146,16 @@ const T = {
 };
 
 /* ─── Keyboard Time Picker Component ─── */
-function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter, lang }: {
+function KeyboardTimePicker({ 
+  h, m, s, onChangeH, onChangeM, onChangeS, onEnter, lang, autoFocusField = 'none' 
+}: {
   h: number; m: number; s: number;
   onChangeH: (v: number) => void;
   onChangeM: (v: number) => void;
   onChangeS: (v: number) => void;
   onEnter?: () => void;
   lang: Lang;
+  autoFocusField?: 'h' | 'm' | 'none';
 }) {
   const hRef = useRef<HTMLInputElement>(null);
   const mRef = useRef<HTMLInputElement>(null);
@@ -170,16 +173,28 @@ function KeyboardTimePicker({ h, m, s, onChangeH, onChangeM, onChangeS, onEnter,
     setSStr(s === 0 ? "" : s.toString());
   }, [h, m, s]);
 
-  // Auto focus first input (Hours) on mount with a safe delay
+  // Focus appropriate field on mount with a safe delay
   useEffect(() => {
     const timer = setTimeout(() => {
-      hRef.current?.focus();
-      hRef.current?.select();
+      if (autoFocusField === 'h') {
+        hRef.current?.focus();
+        hRef.current?.select();
+      } else if (autoFocusField === 'm') {
+        mRef.current?.focus();
+        mRef.current?.select();
+        
+        // Scroll the edit card into view when focusing minutes on mount
+        const card = mRef.current?.closest('.edit-mushroom-card');
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      }
     }, 150);
     return () => clearTimeout(timer);
-  }, []);
+  }, [autoFocusField]);
 
   const presets = [
+    { label: lang === 'zh' ? '0小時' : '0h', value: 0 },
     { label: lang === 'zh' ? '1小時' : '1h', value: 1 },
     { label: lang === 'zh' ? '2小時' : '2h', value: 2 },
     { label: lang === 'zh' ? '3小時' : '3h', value: 3 },
@@ -618,6 +633,20 @@ export default function PikminDashboard() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Focus quick-name input when Add Modal opens
+  useEffect(() => {
+    if (isAdding) {
+      const timer = setTimeout(() => {
+        const input = document.getElementById('quick-name');
+        if (input) {
+          (input as HTMLInputElement).focus();
+          (input as HTMLInputElement).select();
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isAdding]);
 
   // 3. Check URL parameters for ?room=X9W3R2 or restore saved active room
   useEffect(() => {
@@ -1704,7 +1733,7 @@ export default function PikminDashboard() {
             <div className="grid gap-5">
               <div>
                  <label className="block text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">{t.mushroomName}</label>
-                 <input id="quick-name" placeholder={t.mushroomNamePlaceholder} className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 p-4 rounded-2xl outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-all text-lg font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-slate-100" />
+                 <input autoFocus id="quick-name" placeholder={t.mushroomNamePlaceholder} className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 p-4 rounded-2xl outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-all text-lg font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-slate-100" />
               </div>
               
               <div>
@@ -1720,8 +1749,9 @@ export default function PikminDashboard() {
                     h={addH} m={addM} s={addS}
                     onChangeH={setAddH} onChangeM={setAddM} onChangeS={setAddS}
                     onEnter={handleAddSubmit}
-                    lang={lang}
-                  />
+                     lang={lang}
+                     autoFocusField="none"
+                   />
                </div>
  
                <button 
@@ -1834,6 +1864,7 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
             onChangeS={v => { setEditS(v); setEditTimeChanged(true); }}
             onEnter={handleEditSubmit}
             lang={lang}
+            autoFocusField="m"
           />
         </div>
 
