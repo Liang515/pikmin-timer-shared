@@ -1469,9 +1469,7 @@ export default function PikminDashboard() {
             <div className="flex gap-1.5">
               <button 
                 onClick={() => {
-                  const base = (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')
-                    ? (window.location.origin + window.location.pathname)
-                    : FALLBACK_SHARE_URL;
+                  const base = FALLBACK_SHARE_URL;
                   const shareUrl = base + (base.endsWith('/') ? '' : '/') + `?room=${roomId}`;
                   copyToClipboard(shareUrl);
                   setShowCopyMessage(true);
