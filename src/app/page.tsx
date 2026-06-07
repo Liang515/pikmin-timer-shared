@@ -286,7 +286,6 @@ function KeyboardTimePicker({
   };
 
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    setClickedPresetId(null);
     e.target.select();
     const card = e.target.closest('.edit-mushroom-card');
     if (card) {
@@ -1983,13 +1982,21 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
                 />
               </div>
 
-              <button 
-                id={`save-edit-btn-${m.id}`}
-                onClick={handleEditSubmit}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white py-4 rounded-2xl font-bold text-lg shadow-[0_10px_20px_rgba(16,185,129,0.3)] transition-all flex items-center justify-center gap-2 mt-2 focus:outline-none focus:ring-4 focus:ring-emerald-500/50"
-              >
-                <Check size={24} /> {t.saveChanges}
-              </button>
+              <div className="flex gap-3 mt-2">
+                <button 
+                  id={`save-edit-btn-${m.id}`}
+                  onClick={handleEditSubmit}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white py-4 rounded-2xl font-bold text-lg shadow-[0_10px_20px_rgba(16,185,129,0.3)] transition-all flex items-center justify-center gap-2 focus:outline-none focus:ring-4 focus:ring-emerald-500/50"
+                >
+                  <Check size={20} /> {t.saveChanges}
+                </button>
+                <button 
+                  onClick={() => setEditingId(null)}
+                  className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 text-slate-600 dark:text-slate-300 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-slate-500/20"
+                >
+                  {t.cancel}
+                </button>
+              </div>
             </div>
           </div>
         </div>
