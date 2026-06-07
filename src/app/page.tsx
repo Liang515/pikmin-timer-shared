@@ -11,6 +11,7 @@ import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
 type Lang = 'zh' | 'en';
+const FALLBACK_SHARE_URL = 'https://pikmin-timer-shared.vercel.app';
 const T = {
   zh: {
     home: '首頁',
@@ -1468,7 +1469,10 @@ export default function PikminDashboard() {
             <div className="flex gap-1.5">
               <button 
                 onClick={() => {
-                  const shareUrl = window.location.origin + window.location.pathname + `?room=${roomId}`;
+                  const base = (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')
+                    ? (window.location.origin + window.location.pathname)
+                    : FALLBACK_SHARE_URL;
+                  const shareUrl = base + (base.endsWith('/') ? '' : '/') + `?room=${roomId}`;
                   copyToClipboard(shareUrl);
                   setShowCopyMessage(true);
                   setTimeout(() => setShowCopyMessage(false), 2000);
