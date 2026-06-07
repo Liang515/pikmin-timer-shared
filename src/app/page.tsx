@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { Plus, Minus, ExternalLink, Trash2, RotateCcw, Clock, BellRing, Sparkles, Users, Edit3, Check, X, MapPin, Globe, Moon, Sun, ChevronUp, ChevronDown, Copy, LogOut, Share2, Users2, ArrowLeft } from 'lucide-react';
 import { Mushroom, AreaGroup } from '@/types/mushroom';
 import { db, auth } from './firebase';
@@ -147,7 +148,7 @@ const T = {
 
 /* ─── Keyboard Time Picker Component ─── */
 function KeyboardTimePicker({ 
-  h, m, s, onChangeH, onChangeM, onChangeS, onEnter, lang, autoFocusField = 'none' 
+  h, m, s, onChangeH, onChangeM, onChangeS, onEnter, lang, autoFocusField = 'none', mInputId 
 }: {
   h: number; m: number; s: number;
   onChangeH: (v: number) => void;
@@ -156,6 +157,7 @@ function KeyboardTimePicker({
   onEnter?: () => void;
   lang: Lang;
   autoFocusField?: 'h' | 'm' | 'none';
+  mInputId?: string;
 }) {
   const hRef = useRef<HTMLInputElement>(null);
   const mRef = useRef<HTMLInputElement>(null);
@@ -340,6 +342,7 @@ function KeyboardTimePicker({
 
         <div className="flex flex-col items-center gap-1 flex-1">
           <input
+            id={mInputId}
             ref={mRef}
             type="text"
             inputMode="numeric"
@@ -1730,7 +1733,16 @@ export default function PikminDashboard() {
 
       {/* Floating Action Button */}
       <button 
-        onClick={() => setIsAdding(true)}
+        onClick={() => {
+          flushSync(() => {
+            setIsAdding(true);
+          });
+          const input = document.getElementById('quick-name');
+          if (input) {
+            (input as HTMLInputElement).focus();
+            (input as HTMLInputElement).select();
+          }
+        }}
         className={`fixed bottom-6 right-6 sm:bottom-10 sm:right-10 w-16 h-16 bg-emerald-600 text-white rounded-full shadow-[0_12px_30px_rgba(16,185,129,0.45)] hover:shadow-[0_16px_35px_rgba(16,185,129,0.6)] flex items-center justify-center hover:scale-105 hover:-translate-y-0.5 active:scale-95 hover:bg-emerald-500 transition-all z-40 group ${editingId ? 'translate-y-24 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}
       >
         <Plus size={32} className="group-hover:rotate-90 transition-transform duration-300" />
@@ -1914,7 +1926,34 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
           </div>
           
           <div className="flex gap-2">
-            <button onClick={() => setEditingId(m.id)} className={`p-2 rounded-full active:scale-90 hover:scale-105 transition-all ${isOver ? 'bg-slate-200 hover:bg-slate-300 text-slate-600 dark:bg-slate-800 dark:text-slate-400' : 'bg-black/10 hover:bg-black/20'}`} title="編輯">
+            <button 
+              onClick={() => {
+                const remaining = Math.max(0, m.battleEndTime - Date.now());
+                const totalSec = Math.floor(remaining / 1000);
+                const calculatedH = Math.floor(totalSec / 3600);
+                const calculatedM = Math.floor((totalSec % 3600) / 60);
+                const calculatedS = totalSec % 60;
+
+                setEditP(m.participants);
+                setEditName(m.name);
+                setEditH(calculatedH);
+                setEditM(calculatedM);
+                setEditS(calculatedS);
+                setEditTimeChanged(false);
+
+                flushSync(() => {
+                  setEditingId(m.id);
+                });
+
+                const input = document.getElementById(`edit-minutes-input-${m.id}`);
+                if (input) {
+                  (input as HTMLInputElement).focus();
+                  (input as HTMLInputElement).select();
+                }
+              }}
+              className={`p-2 rounded-full active:scale-90 hover:scale-105 transition-all ${isOver ? 'bg-slate-200 hover:bg-slate-300 text-slate-600 dark:bg-slate-800 dark:text-slate-400' : 'bg-black/10 hover:bg-black/20'}`} 
+              title="編輯"
+            >
               <Edit3 size={18} />
             </button>
             <button onClick={() => onDelete(m.id)} className={`p-2 rounded-full active:scale-90 hover:scale-105 transition-all ${isOver ? 'bg-slate-200 hover:bg-slate-300 text-slate-600 dark:bg-slate-800 dark:text-slate-400' : 'bg-black/10 hover:bg-black/20'}`} title="刪除">
@@ -1979,6 +2018,7 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
                   onEnter={handleEditSubmit}
                   lang={lang}
                   autoFocusField="m"
+                  mInputId={`edit-minutes-input-${m.id}`}
                 />
               </div>
 
