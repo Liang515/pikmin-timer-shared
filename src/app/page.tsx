@@ -165,13 +165,37 @@ function KeyboardTimePicker({
   const [hStr, setHStr] = useState(h === 0 ? "" : h.toString());
   const [mStr, setMStr] = useState(m === 0 ? "" : m.toString());
   const [sStr, setSStr] = useState(s === 0 ? "" : s.toString());
+  const [clickedPresetId, setClickedPresetId] = useState<string | null>(null);
+
+  const presets = [
+    { id: '0m', label: lang === 'zh' ? '0分鐘' : '0m', type: 'm', value: 0 },
+    { id: '0h', label: lang === 'zh' ? '0小時' : '0h', type: 'h', value: 0 },
+    { id: '1h', label: lang === 'zh' ? '1小時' : '1h', type: 'h', value: 1 },
+    { id: '2h', label: lang === 'zh' ? '2小時' : '2h', type: 'h', value: 2 },
+    { id: '3h', label: lang === 'zh' ? '3小時' : '3h', type: 'h', value: 3 },
+  ];
 
   // Sync inputs if parent values change
   useEffect(() => {
     setHStr(h === 0 ? "" : h.toString());
     setMStr(m === 0 ? "" : m.toString());
     setSStr(s === 0 ? "" : s.toString());
-  }, [h, m, s]);
+
+    // Clear clickedPresetId if the new values do not match the expected values for the clicked preset
+    if (clickedPresetId) {
+      const preset = presets.find(p => p.id === clickedPresetId);
+      if (preset) {
+        const matches = preset.type === 'h'
+          ? (h === preset.value && m === 0 && s === 0)
+          : (h === 0 && m === preset.value && s === 0);
+        if (!matches) {
+          setClickedPresetId(null);
+        }
+      } else {
+        setClickedPresetId(null);
+      }
+    }
+  }, [h, m, s, clickedPresetId, lang]);
 
   // Focus appropriate field on mount with a safe delay
   useEffect(() => {
@@ -193,23 +217,10 @@ function KeyboardTimePicker({
     return () => clearTimeout(timer);
   }, [autoFocusField]);
 
-  const presets = [
-    { label: lang === 'zh' ? '0分鐘' : '0m', type: 'm', value: 0 },
-    { label: lang === 'zh' ? '0小時' : '0h', type: 'h', value: 0 },
-    { label: lang === 'zh' ? '1小時' : '1h', type: 'h', value: 1 },
-    { label: lang === 'zh' ? '2小時' : '2h', type: 'h', value: 2 },
-    { label: lang === 'zh' ? '3小時' : '3h', type: 'h', value: 3 },
-  ];
-
-  const isActive = (preset: typeof presets[0]) => {
-    if (preset.type === 'h') {
-      return h === preset.value && m === 0 && s === 0;
-    } else {
-      return h === 0 && m === preset.value && s === 0;
-    }
-  };
+  const isActive = (preset: typeof presets[0]) => clickedPresetId === preset.id;
 
   const handlePresetClick = (preset: typeof presets[0]) => {
+    setClickedPresetId(preset.id);
     if (preset.type === 'h') {
       onChangeH(preset.value);
       onChangeM(0);
@@ -254,6 +265,7 @@ function KeyboardTimePicker({
     onChange: (v: number) => void,
     nextRef?: React.RefObject<HTMLInputElement | null>
   ) => {
+    setClickedPresetId(null);
     const digits = val.replace(/\D/g, '').slice(0, 2);
     setStr(digits);
 
@@ -289,6 +301,7 @@ function KeyboardTimePicker({
   };
 
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    setClickedPresetId(null);
     e.target.select();
     const card = e.target.closest('.edit-mushroom-card');
     if (card) {
@@ -301,7 +314,7 @@ function KeyboardTimePicker({
   return (
     <div className="flex flex-col gap-3 w-full">
       {/* Quick Presets */}
-      <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start">
+      <div className="flex flex-nowrap gap-1.5 overflow-x-auto no-scrollbar scroll-smooth w-full justify-start py-1 -my-1">
         {presets.map(p => {
           const active = isActive(p);
           return (
@@ -309,7 +322,7 @@ function KeyboardTimePicker({
               key={p.label}
               type="button"
               onClick={() => handlePresetClick(p)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95 transition-all ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap active:scale-95 transition-all shrink-0 ${
                 active
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30'
                   : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/40 dark:border-slate-700/50'
