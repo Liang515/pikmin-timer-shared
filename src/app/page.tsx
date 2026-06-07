@@ -511,6 +511,7 @@ export default function PikminDashboard() {
 
   // V4 Shared Room States
   const [roomId, setRoomId] = useState<string>("");
+  const [isLocalDataLoaded, setIsLocalDataLoaded] = useState(false);
   const [roomName, setRoomName] = useState<string>("");
   const [userId, setUserId] = useState<string>("");
   const [loadingRoom, setLoadingRoom] = useState<boolean>(false);
@@ -705,6 +706,13 @@ export default function PikminDashboard() {
     restoreRoom();
   }, [isRestoredState]);
 
+  // 3.5 Reset data loaded state when roomId changes to prevent old data flash
+  useEffect(() => {
+    setIsLocalDataLoaded(false);
+    setMushrooms([]);
+    setGroups([]);
+  }, [roomId]);
+
   // 4. Load from LocalStorage/Preferences if roomId === "local"
   useEffect(() => {
     if (roomId !== "local") return;
@@ -734,18 +742,21 @@ export default function PikminDashboard() {
         } catch (e) {
           console.error(e);
         }
+      } else {
+        setMushrooms([]);
       }
+      setIsLocalDataLoaded(true);
     };
 
     loadLocalData();
-  }, [roomId]);
+  }, [roomId, lang]);
 
   // 5. Save to LocalStorage/Preferences if roomId === "local"
   useEffect(() => {
-    if (roomId !== "local") return;
+    if (roomId !== "local" || !isLocalDataLoaded) return;
     safeSetItem('pikmin_mushrooms', JSON.stringify(mushrooms));
     safeSetItem('pikmin_groups', JSON.stringify(groups));
-  }, [mushrooms, groups, roomId]);
+  }, [mushrooms, groups, roomId, isLocalDataLoaded]);
 
   // 5.5 Save language preference unconditionally on change
   useEffect(() => {
@@ -1366,10 +1377,10 @@ export default function PikminDashboard() {
 
   return (
     <main 
-      className={`min-h-screen bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 p-3 sm:p-4 pb-24 md:p-8 font-sans transition-all duration-500 ${theme}`}
+      className={`min-h-screen w-full overflow-x-hidden bg-gradient-to-tr from-stone-100 via-emerald-50/15 to-amber-50/20 dark:from-slate-950 dark:via-emerald-950/10 dark:to-slate-900 p-3 sm:p-4 pb-24 md:p-8 font-sans transition-all duration-500 ${theme}`}
       style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
     >
-      <header className="flex justify-between items-center mb-4 sm:mb-6 max-w-2xl mx-auto bg-white/40 dark:bg-slate-900/40 backdrop-blur-md px-4 py-3 rounded-full border border-stone-200/40 dark:border-slate-800/40 shadow-sm">
+      <header className="flex justify-between items-center mb-4 sm:mb-6 max-w-2xl mx-auto bg-white/40 dark:bg-slate-900/40 backdrop-blur-md px-3 py-2.5 sm:px-4 sm:py-3 rounded-full border border-stone-200/40 dark:border-slate-800/40 shadow-sm">
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center shadow-inner shrink-0">
             <span className="text-2xl sm:text-2xl select-none">🍄</span>
@@ -1387,11 +1398,11 @@ export default function PikminDashboard() {
           {roomId === "local" && (
             <button 
               onClick={exitRoom} 
-              className="px-3.5 py-2 bg-stone-200/50 hover:bg-stone-300/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 rounded-full shadow-sm text-slate-600 dark:text-slate-300 active:scale-95 hover:scale-102 transition-all font-bold flex items-center gap-1.5 text-xs border border-stone-200/10 shrink-0"
+              className="p-2 sm:p-2.5 sm:px-3.5 sm:py-2 bg-stone-200/50 hover:bg-stone-300/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 rounded-full shadow-sm text-slate-600 dark:text-slate-300 active:scale-95 hover:scale-102 transition-all font-bold flex items-center justify-center gap-1.5 text-xs border border-stone-200/10 shrink-0"
               title={lang === 'zh' ? '切換至共享房間模式' : 'Switch to Shared Room'}
             >
-              <LogOut size={13} className="rotate-180 text-emerald-600 dark:text-emerald-400" />
-              <span>{lang === 'zh' ? '返回模式' : 'Switch Mode'}</span>
+              <LogOut size={16} className="rotate-180 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="hidden sm:inline">{lang === 'zh' ? '返回模式' : 'Switch Mode'}</span>
             </button>
           )}
           <button onClick={toggleTheme} className="p-2 sm:p-2.5 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-600 dark:text-slate-300 active:scale-95 hover:scale-105 transition-all hover:shadow-md border border-stone-200/10" title="切換主題">
