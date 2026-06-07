@@ -180,22 +180,7 @@ function KeyboardTimePicker({
     setHStr(h === 0 ? "" : h.toString());
     setMStr(m === 0 ? "" : m.toString());
     setSStr(s === 0 ? "" : s.toString());
-
-    // Clear clickedPresetId if the new values do not match the expected values for the clicked preset
-    if (clickedPresetId) {
-      const preset = presets.find(p => p.id === clickedPresetId);
-      if (preset) {
-        const matches = preset.type === 'h'
-          ? (h === preset.value && m === 0 && s === 0)
-          : (h === 0 && m === preset.value && s === 0);
-        if (!matches) {
-          setClickedPresetId(null);
-        }
-      } else {
-        setClickedPresetId(null);
-      }
-    }
-  }, [h, m, s, clickedPresetId, lang]);
+  }, [h, m, s]);
 
   // Focus appropriate field on mount with a safe delay
   useEffect(() => {
@@ -1825,8 +1810,6 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
   
   const t = T[lang];
 
-  const cardRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (isEditing) {
       setEditP(m.participants);
@@ -1838,12 +1821,6 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
       setEditM(Math.floor((totalSec % 3600) / 60));
       setEditS(totalSec % 60);
       setEditTimeChanged(false);
-
-      // Scroll into view on edit start
-      const timer = setTimeout(() => {
-        cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }, 250);
-      return () => clearTimeout(timer);
     }
   }, [isEditing, m.participants, m.name, m.battleEndTime]);
 
@@ -1879,48 +1856,6 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
     setEditingId(null);
   };
 
-  if (isEditing) {
-    return (
-      <div ref={cardRef} className="edit-mushroom-card bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl shadow-sm border-2 border-blue-500 transition-all text-slate-800 dark:text-slate-100">
-        <div className="mb-3">
-          <input 
-            value={editName}
-            onChange={e => setEditName(e.target.value)}
-            className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg w-full font-bold text-slate-700 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500 text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 mb-3"
-            placeholder={t.defaultMushroom}
-          />
-          <ParticipantSlider value={editP} onChange={setEditP} />
-        </div>
-
-        <div className="flex flex-col gap-2 mb-4 bg-slate-50 dark:bg-slate-800/50 p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-          <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold mb-1 flex items-center gap-1"><Clock size={14} /> {t.resetTime}</div>
-          <KeyboardTimePicker
-            h={editH} m={editM} s={editS}
-            onChangeH={v => { setEditH(v); setEditTimeChanged(true); }}
-            onChangeM={v => { setEditM(v); setEditTimeChanged(true); }}
-            onChangeS={v => { setEditS(v); setEditTimeChanged(true); }}
-            onEnter={handleEditSubmit}
-            lang={lang}
-            autoFocusField="m"
-          />
-        </div>
-
-        <div className="flex gap-2">
-          <button 
-            id={`save-edit-btn-${m.id}`}
-            onClick={handleEditSubmit}
-            className="bg-emerald-600 text-white px-4 py-3 rounded-xl flex-1 font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 active:scale-95 transition-transform hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/50"
-          >
-            <Check size={18} /> {t.saveChanges}
-          </button>
-          <button onClick={() => setEditingId(null)} className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 px-4 py-3 rounded-xl font-bold active:scale-95 transition-transform focus:outline-none focus:ring-4 focus:ring-slate-500/20">
-            {t.cancel}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   let cardClass = "";
   if (isOver) {
     cardClass = "bg-white/70 dark:bg-slate-900/60 backdrop-blur-md text-slate-700 dark:text-slate-300 border border-stone-200/50 dark:border-slate-800/60 shadow-sm opacity-90";
@@ -1931,72 +1866,134 @@ function MushroomItem({ m, now, lang, isEditing, setEditingId, onDelete, onUpdat
   }
 
   return (
-    <div 
-      className={`p-5 rounded-3xl transition-all duration-300 ease-out hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] relative overflow-hidden flex flex-col sm:flex-row justify-between items-center gap-4 isolate ${cardClass}`}
-      style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
-    >
-      <div className="flex flex-col items-start w-full sm:w-auto">
-        <h3 className={`text-xl font-bold flex flex-wrap items-center gap-2 ${isOver ? 'text-slate-800 dark:text-slate-200' : 'text-white'}`}>
-          {m.name}
-          <span className={`flex items-center gap-1 text-sm px-2 py-0.5 rounded-full font-normal shadow-sm ${isOver ? 'bg-slate-200 text-slate-600 dark:bg-slate-800/80 dark:text-slate-400' : 'bg-white/20 text-white'}`}>
-            <Users size={14} /> {m.participants} {t.players}
-          </span>
-          {isWaitingRespawn && (
-             <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full font-bold shadow-sm">
-               {t.respawning}
-             </span>
-          )}
-        </h3>
-        <div className="mt-1">
-          <p className={`text-xs flex items-center gap-1.5 ${isOver ? 'text-slate-600 dark:text-slate-400' : 'text-white/80'}`}>
-            <Clock size={12} />
-            {t.battleEnds}{new Date(battleEnd).toLocaleTimeString(lang === 'zh' ? 'zh-TW' : 'en-US')}
-          </p>
-          <p className={`text-xs flex items-center gap-1.5 mt-0.5 ${isOver ? 'text-slate-500 dark:text-slate-500' : 'text-white/60'}`}>
-            <RotateCcw size={12} />
-            {t.estRespawn}{new Date(m.endTime).toLocaleTimeString(lang === 'zh' ? 'zh-TW' : 'en-US')}
-          </p>
+    <>
+      <div 
+        className={`p-5 rounded-3xl transition-all duration-300 ease-out hover:scale-[1.01] hover:-translate-y-0.5 active:scale-[0.99] relative overflow-hidden flex flex-col sm:flex-row justify-between items-center gap-4 isolate ${cardClass}`}
+        style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
+      >
+        <div className="flex flex-col items-start w-full sm:w-auto">
+          <h3 className={`text-xl font-bold flex flex-wrap items-center gap-2 ${isOver ? 'text-slate-800 dark:text-slate-200' : 'text-white'}`}>
+            {m.name}
+            <span className={`flex items-center gap-1 text-sm px-2 py-0.5 rounded-full font-normal shadow-sm ${isOver ? 'bg-slate-200 text-slate-600 dark:bg-slate-800/80 dark:text-slate-400' : 'bg-white/20 text-white'}`}>
+              <Users size={14} /> {m.participants} {t.players}
+            </span>
+            {isWaitingRespawn && (
+               <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full font-bold shadow-sm">
+                 {t.respawning}
+               </span>
+            )}
+          </h3>
+          <div className="mt-1">
+            <p className={`text-xs flex items-center gap-1.5 ${isOver ? 'text-slate-600 dark:text-slate-400' : 'text-white/80'}`}>
+              <Clock size={12} />
+              {t.battleEnds}{new Date(battleEnd).toLocaleTimeString(lang === 'zh' ? 'zh-TW' : 'en-US')}
+            </p>
+            <p className={`text-xs flex items-center gap-1.5 mt-0.5 ${isOver ? 'text-slate-500 dark:text-slate-500' : 'text-white/60'}`}>
+              <RotateCcw size={12} />
+              {t.estRespawn}{new Date(m.endTime).toLocaleTimeString(lang === 'zh' ? 'zh-TW' : 'en-US')}
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="flex items-center gap-4 w-full sm:w-auto justify-between mt-2 sm:mt-0">
-        <div className="flex gap-1 sm:gap-1.5 font-mono text-2xl sm:text-3xl font-bold">
-          {isOver ? <span className="text-lg sm:text-xl flex items-center gap-2 text-slate-600 dark:text-slate-300 font-sans"><Sparkles size={20}/> {t.respawnComplete}</span> : (
-            <>
-              <div className="bg-white/15 px-1.5 sm:px-2 py-1 rounded-xl flex flex-col items-center min-w-[40px] sm:min-w-[50px]">
-                <span className="text-xl sm:text-2xl">{timeFmt.h}</span>
-              </div>
-              <span className="opacity-60">:</span>
-              <div className="bg-white/15 px-1.5 sm:px-2 py-1 rounded-xl flex flex-col items-center min-w-[40px] sm:min-w-[50px]">
-                <span className="text-xl sm:text-2xl">{timeFmt.m}</span>
-              </div>
-              <span className="opacity-60">:</span>
-              <div className="bg-white/15 px-1.5 sm:px-2 py-1 rounded-xl flex flex-col items-center min-w-[40px] sm:min-w-[50px]">
-                <span className="text-xl sm:text-2xl">{timeFmt.s}</span>
-              </div>
-            </>
-          )}
+        <div className="flex items-center gap-4 w-full sm:w-auto justify-between mt-2 sm:mt-0">
+          <div className="flex gap-1 sm:gap-1.5 font-mono text-2xl sm:text-3xl font-bold">
+            {isOver ? <span className="text-lg sm:text-xl flex items-center gap-2 text-slate-600 dark:text-slate-300 font-sans"><Sparkles size={20}/> {t.respawnComplete}</span> : (
+              <>
+                <div className="bg-white/15 px-1.5 sm:px-2 py-1 rounded-xl flex flex-col items-center min-w-[40px] sm:min-w-[50px]">
+                  <span className="text-xl sm:text-2xl">{timeFmt.h}</span>
+                </div>
+                <span className="opacity-60">:</span>
+                <div className="bg-white/15 px-1.5 sm:px-2 py-1 rounded-xl flex flex-col items-center min-w-[40px] sm:min-w-[50px]">
+                  <span className="text-xl sm:text-2xl">{timeFmt.m}</span>
+                </div>
+                <span className="opacity-60">:</span>
+                <div className="bg-white/15 px-1.5 sm:px-2 py-1 rounded-xl flex flex-col items-center min-w-[40px] sm:min-w-[50px]">
+                  <span className="text-xl sm:text-2xl">{timeFmt.s}</span>
+                </div>
+              </>
+            )}
+          </div>
+          
+          <div className="flex gap-2">
+            <button onClick={() => setEditingId(m.id)} className={`p-2 rounded-full active:scale-90 hover:scale-105 transition-all ${isOver ? 'bg-slate-200 hover:bg-slate-300 text-slate-600 dark:bg-slate-800 dark:text-slate-400' : 'bg-black/10 hover:bg-black/20'}`} title="編輯">
+              <Edit3 size={18} />
+            </button>
+            <button onClick={() => onDelete(m.id)} className={`p-2 rounded-full active:scale-90 hover:scale-105 transition-all ${isOver ? 'bg-slate-200 hover:bg-slate-300 text-slate-600 dark:bg-slate-800 dark:text-slate-400' : 'bg-black/10 hover:bg-black/20'}`} title="刪除">
+              <Trash2 size={18} />
+            </button>
+          </div>
         </div>
         
-        <div className="flex gap-2">
-          <button onClick={() => setEditingId(m.id)} className={`p-2 rounded-full active:scale-90 hover:scale-105 transition-all ${isOver ? 'bg-slate-200 hover:bg-slate-300 text-slate-600 dark:bg-slate-800 dark:text-slate-400' : 'bg-black/10 hover:bg-black/20'}`} title="編輯">
-            <Edit3 size={18} />
-          </button>
-          <button onClick={() => onDelete(m.id)} className={`p-2 rounded-full active:scale-90 hover:scale-105 transition-all ${isOver ? 'bg-slate-200 hover:bg-slate-300 text-slate-600 dark:bg-slate-800 dark:text-slate-400' : 'bg-black/10 hover:bg-black/20'}`} title="刪除">
-            <Trash2 size={18} />
-          </button>
-        </div>
+        {/* Progress Bar */}
+        {!isOver && (
+          <div className="absolute bottom-0 left-0 h-1 bg-black/10 w-full overflow-hidden">
+            <div 
+              className="h-full bg-white/40 shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-1000 ease-linear" 
+              style={{ width: `${Math.min(100, Math.max(0, ((now - (m.startTime || now)) / Math.max(1, (m.battleEndTime - (m.startTime || now)))) * 100))}%` }}
+            />
+          </div>
+        )}
       </div>
-      
-      {/* Progress Bar */}
-      {!isOver && (
-        <div className="absolute bottom-0 left-0 h-1 bg-black/10 w-full overflow-hidden">
+
+      {/* Edit Mushroom Modal */}
+      {isEditing && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div 
-            className="h-full bg-white/40 shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-1000 ease-linear" 
-            style={{ width: `${Math.min(100, Math.max(0, ((now - (m.startTime || now)) / Math.max(1, (m.battleEndTime - (m.startTime || now)))) * 100))}%` }}
-          />
+            className="edit-mushroom-card bg-white dark:bg-slate-950 w-full sm:max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 sm:p-8 shadow-2xl border border-slate-100/50 dark:border-slate-900/50 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-300 text-slate-800 dark:text-slate-100"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-emerald-500 to-teal-600 bg-clip-text text-transparent flex items-center gap-2">
+                <Edit3 size={24} className="text-emerald-500" />
+                {lang === 'zh' ? '修改計時器' : 'Edit Timer'}
+              </h2>
+              <button onClick={() => setEditingId(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid gap-5">
+              <div>
+                <label className="block text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">{t.mushroomName}</label>
+                <input 
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 p-4 rounded-2xl outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition-all text-lg font-medium placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-slate-100"
+                  placeholder={t.defaultMushroom}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">{t.participants}</label>
+                <ParticipantSlider value={editP} onChange={setEditP} />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1"><Clock size={16}/> {t.remainingTime}</label>
+                </div>
+                <KeyboardTimePicker
+                  h={editH} m={editM} s={editS}
+                  onChangeH={v => { setEditH(v); setEditTimeChanged(true); }}
+                  onChangeM={v => { setEditM(v); setEditTimeChanged(true); }}
+                  onChangeS={v => { setEditS(v); setEditTimeChanged(true); }}
+                  onEnter={handleEditSubmit}
+                  lang={lang}
+                  autoFocusField="m"
+                />
+              </div>
+
+              <button 
+                id={`save-edit-btn-${m.id}`}
+                onClick={handleEditSubmit}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white py-4 rounded-2xl font-bold text-lg shadow-[0_10px_20px_rgba(16,185,129,0.3)] transition-all flex items-center justify-center gap-2 mt-2 focus:outline-none focus:ring-4 focus:ring-emerald-500/50"
+              >
+                <Check size={24} /> {t.saveChanges}
+              </button>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
