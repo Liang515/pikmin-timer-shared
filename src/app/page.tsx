@@ -194,28 +194,52 @@ function KeyboardTimePicker({
   }, [autoFocusField]);
 
   const presets = [
-    { label: lang === 'zh' ? '0小時' : '0h', value: 0 },
-    { label: lang === 'zh' ? '1小時' : '1h', value: 1 },
-    { label: lang === 'zh' ? '2小時' : '2h', value: 2 },
-    { label: lang === 'zh' ? '3小時' : '3h', value: 3 },
+    { label: lang === 'zh' ? '0分鐘' : '0m', type: 'm', value: 0 },
+    { label: lang === 'zh' ? '0小時' : '0h', type: 'h', value: 0 },
+    { label: lang === 'zh' ? '1小時' : '1h', type: 'h', value: 1 },
+    { label: lang === 'zh' ? '2小時' : '2h', type: 'h', value: 2 },
+    { label: lang === 'zh' ? '3小時' : '3h', type: 'h', value: 3 },
   ];
 
+  const isActive = (preset: typeof presets[0]) => {
+    if (preset.type === 'h') {
+      return h === preset.value && m === 0 && s === 0;
+    } else {
+      return h === 0 && m === preset.value && s === 0;
+    }
+  };
+
   const handlePresetClick = (preset: typeof presets[0]) => {
-    onChangeH(preset.value);
-    onChangeM(0);
-    onChangeS(0);
-    setHStr(preset.value.toString());
-    setMStr("");
-    setSStr("");
-    
-    // Focus and select synchronously so iOS triggers numeric keyboard
-    if (mRef.current) {
-      mRef.current.focus();
-      mRef.current.select();
+    if (preset.type === 'h') {
+      onChangeH(preset.value);
+      onChangeM(0);
+      onChangeS(0);
+      setHStr(preset.value.toString());
+      setMStr("");
+      setSStr("");
+      
+      // Focus and select synchronously so iOS triggers numeric keyboard
+      if (mRef.current) {
+        mRef.current.focus();
+        mRef.current.select();
+      }
+    } else {
+      onChangeH(0);
+      onChangeM(preset.value);
+      onChangeS(0);
+      setHStr("");
+      setMStr(preset.value.toString());
+      setSStr("");
+      
+      // Focus and select synchronously so iOS triggers numeric keyboard on seconds field
+      if (sRef.current) {
+        sRef.current.focus();
+        sRef.current.select();
+      }
     }
 
     // Scroll card into view
-    const card = mRef.current?.closest('.edit-mushroom-card');
+    const card = (preset.type === 'h' ? mRef.current : sRef.current)?.closest('.edit-mushroom-card');
     if (card) {
       setTimeout(() => {
         card.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -279,7 +303,7 @@ function KeyboardTimePicker({
       {/* Quick Presets */}
       <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start">
         {presets.map(p => {
-          const active = h === p.value && m === 0 && s === 0;
+          const active = isActive(p);
           return (
             <button
               key={p.label}
