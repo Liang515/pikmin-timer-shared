@@ -19,9 +19,9 @@ With this tool, you can create real-time synchronized shared rooms with your exp
 - **Dual-Platform Support**: Web version supports standard browser push notifications; Native App version supports iOS system-level local notifications.
 - **Triple Timed Alerts**: Includes "Battle Ended (5m before respawn)", "Respawn Soon (1m before respawn)", and "Respawned Complete", ensuring you and your squad never miss a mushroom!
 
-### ⏱️ Smart Recent Rooms History
-- The homepage automatically remembers up to 5 rooms that you have recently successfully created or joined.
-- When you reopen the web app, a glassmorphic "⏱️ Recent Rooms" list will appear on the homepage. **Simply tap a room to connect and enter instantly**, without having to repeatedly copy and paste codes!
+### ⏱️ Smart Recent Rooms & Tab State Recovery
+- **Auto-Save Active Room & Tab**: Automatically restores the active room and area tab you were visiting. Even if the browser/app is closed or refreshed, you will **automatically reconnect and return to the same room and area page** upon reopening, without having to manually select or enter again!
+- **Smart Recent Rooms History**: The homepage automatically remembers up to 5 rooms that you have recently successfully created or joined. A glassmorphic "⏱️ Recent Rooms" list will appear on the homepage; **simply tap a room to connect and enter instantly**, without having to copy and paste codes.
 
 ### 📱 Premium Mobile Optimization (iOS Auto-Zoom Fix)
 - **Viewport Lock**: Locks the viewport scale so that the page width never wobbles or shakes when pinch-zooming or tapping inputs.
